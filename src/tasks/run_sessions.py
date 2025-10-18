@@ -15,6 +15,12 @@ import httpx
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 from prefect import task
+from prefect.logging import get_run_logger
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).parent.parent))
+from utils.artifacts import create_session_link_artifact
 
 load_dotenv()
 
@@ -46,8 +52,11 @@ def create_session(api_key: str, prompt: str, title: Optional[str] = None) -> st
     result = response.json()
     session_id = result["session_id"]
 
-    print(f"✅ Session created: {session_id}")
-    print(f"   View at: {result['url']}")
+    logger = get_run_logger()
+    logger.info(f"✅ Session created: {session_id}")
+    logger.info(f"   View at: {result['url']}")
+
+    create_session_link_artifact(session_id, result["url"], title)
 
     return session_id
 
@@ -77,7 +86,8 @@ def send_sleep_message(api_key: str, session_id: str) -> None:
         response = client.post(url, headers=headers, json=data)
         response.raise_for_status()
 
-    print("📨 Sleep message sent - ending session")
+    logger = get_run_logger()
+    logger.info("📨 Sleep message sent - ending session")
 
 
 def wait_for_status(
@@ -96,7 +106,8 @@ def wait_for_status(
         status = details.get("status_enum")
 
         elapsed = int(time.time() - start_time)
-        print(f"   Status: {status} (elapsed: {elapsed}s)")
+        logger = get_run_logger()
+        logger.debug(f"   Status: {status} (elapsed: {elapsed}s)")
 
         if status in target_statuses:
             return status
@@ -133,13 +144,16 @@ def wait_for_analysis(
         elapsed = int(time.time() - start_time)
 
         if analysis:
-            print(f"✅ Analysis available (elapsed: {elapsed}s)")
+            logger = get_run_logger()
+            logger.info(f"✅ Analysis available (elapsed: {elapsed}s)")
             return analysis
 
-        print(f"   Analysis not ready (elapsed: {elapsed}s)")
+        logger = get_run_logger()
+        logger.debug(f"   Analysis not ready (elapsed: {elapsed}s)")
         time.sleep(poll_interval)
 
     raise TimeoutError(f"Session analysis not available within {timeout}s")
+
 
 @task
 def run_session_and_wait_for_analysis(
@@ -160,6 +174,7 @@ def run_session_and_wait_for_analysis(
     Returns:
         Dict containing session_id and analysis data
     """
+    logger = get_run_logger()
 
     # Setup
     if api_key is None:
@@ -171,15 +186,17 @@ def run_session_and_wait_for_analysis(
     if timeouts:
         config.update(timeouts)
 
-    print("\n🚀 Starting Devin Session Orchestration")
-    print(f"📋 Prompt: {prompt[:100]}...")
+    logger.info("🚀 Starting Devin Session Orchestration")
+    logger.info(f"📋 Prompt: {prompt[:100]}...")
 
     # Step 1: Create session
-    print("\n[Step 1/4] Creating session...")
+    logger.info("[Step 1/4] Creating session...")
     session_id = create_session(api_key, prompt, title)
 
     # Step 2: Wait for blocked state
-    print(f"\n[Step 2/4] Waiting for blocked state (max {config['blocked_wait']}s)...")
+    logger.info(
+        f"[Step 2/4] Waiting for blocked state (max {config['blocked_wait'] // 60}m)..."
+    )
     status = wait_for_status(
         api_key,
         session_id,
@@ -189,19 +206,21 @@ def run_session_and_wait_for_analysis(
     )
 
     if status != "blocked":
-        print(f"⚠️  Session ended with status: {status}")
+        logger.warning(f"⚠️  Session ended with status: {status}")
         if status == "finished":  # finished = sleeping
             # Already sleeping, skip to analysis
-            print("   Session already sleeping, checking for analysis...")
+            logger.info("   Session already sleeping, checking for analysis...")
         else:
             raise ValueError(f"Unexpected session status: {status}")
     else:
         # Step 3: Send sleep message to end session
-        print("\n[Step 3/4] Sending sleep message to end session...")
+        logger.info("[Step 3/4] Sending sleep message to end session...")
         send_sleep_message(api_key, session_id)
 
         # Wait for sleeping state
-        print(f"   Waiting for sleeping state (max {config['sleeping_wait']}s)...")
+        logger.info(
+            f"   Waiting for sleeping state (max {config['sleeping_wait'] // 60}m)..."
+        )
         status = wait_for_status(
             api_key,
             session_id,
@@ -214,14 +233,14 @@ def run_session_and_wait_for_analysis(
             raise ValueError(f"Session ended with status: {status}")
 
     # Step 4: Wait for session analysis
-    print(
-        f"\n[Step 4/4] Waiting for session analysis (max {config['analysis_wait']}s)..."
+    logger.info(
+        f"[Step 4/4] Waiting for session analysis (max {config['analysis_wait'] // 60}m)..."
     )
     analysis = wait_for_analysis(
         api_key, session_id, config["analysis_wait"], config["poll_interval"]
     )
 
-    print("\n✅ Orchestration complete!")
+    logger.info("✅ Orchestration complete!")
 
     return {
         "session_id": session_id,
@@ -243,7 +262,7 @@ if __name__ == "__main__":
     - Includes example usage
     """
 
-    test_timeouts = {
+    my_timeouts = {
         "blocked_wait": 360,  # 6 minutes for session to reach blocked
         "sleeping_wait": 300,  # 5 minutes to switch to sleeping
         "analysis_wait": 240,  # 4 minutes for analysis to be ready
@@ -251,7 +270,7 @@ if __name__ == "__main__":
     }
 
     result = run_session_and_wait_for_analysis(
-        prompt=example_prompt, title="Fibonacci Function", timeouts=test_timeouts
+        prompt=example_prompt, title="Fibonacci Function", timeouts=my_timeouts
     )
 
     print("\n📊 Session Analysis Summary:")
