@@ -1,58 +1,43 @@
+#!/usr/bin/env python3
 """
-Artifact utilities for the migration orchestration project.
-Provides helper functions for creating various types of Prefect artifacts.
+Test flow for fetching and displaying Devin session analysis.
+This test retrieves analysis from specific sessions and creates rich artifacts.
 """
 
-from prefect.artifacts import create_link_artifact, create_markdown_artifact
-from typing import Optional, Dict, Any
+import os
+import json
+import httpx
+from prefect import flow, task
+from prefect.logging import get_run_logger
+from prefect.artifacts import create_markdown_artifact, create_link_artifact
+from dotenv import load_dotenv
+from typing import Dict, Any, Optional
+import time
+
+load_dotenv()
 
 
-def create_session_link_artifact(
-    session_id: str, session_url: str, title: Optional[str] = None
-) -> str:
-    """
-    Create a link artifact for a Devin session.
+def fetch_session_analysis(api_key: str, session_id: str) -> Optional[Dict[str, Any]]:
+    """Fetch session analysis from the Devin API."""
+    url = f"https://api.devin.ai/beta/v2/enterprise/sessions/{session_id}"
+    headers = {"Authorization": f"Bearer {api_key}"}
 
-    Args:
-        session_id: The Devin session ID
-        session_url: The URL to the Devin session
-        title: Optional title for the session
-
-    Returns:
-        The artifact ID
-    """
-    description = (
-        f"## Devin Session: {title or 'Untitled'}\n\nSession ID: `{session_id}`"
-    )
-
-    artifact_id = create_link_artifact(
-        key=f"session-url-{session_id}",
-        link=session_url,
-        link_text=session_url,
-        description=description,
-    )
-
-    return artifact_id
+    with httpx.Client() as client:
+        response = client.get(url, headers=headers)
+        response.raise_for_status()
+        return response.json().get("session_analysis")
 
 
 def create_timeline_artifact(
     session_id: str, session_url: str, analysis: Dict[str, Any]
 ) -> str:
-    """
-    Create main analysis artifact with issues and timeline.
+    """Create main analysis artifact with timeline."""
 
-    Args:
-        session_id: The Devin session ID
-        session_url: The URL to the Devin session
-        analysis: The analysis data from Devin
-
-    Returns:
-        The artifact ID
-    """
     issues_count = len(analysis.get("issues", []))
     timeline = analysis.get("timeline", [])
 
-    md = f"""# 📊 Analysis
+    md = f"""
+# 📊 Analysis
 
 ## 🐛 ISSUES DETECTED
 
@@ -86,8 +71,8 @@ def create_timeline_artifact(
 
     md += "## 📅 TIMELINE\n\n"
 
-    # List ALL events chronologically with smart emojis
-    for event in timeline:
+    # List ALL events chronologically with emojis
+    for i, event in enumerate(timeline, 1):
         if isinstance(event, dict):
             title = event.get("title", "")
             desc = event.get("description", "")
@@ -140,25 +125,16 @@ def create_timeline_artifact(
     md += f"🔗 [View Full Session]({session_url})\n"
 
     artifact_id = create_markdown_artifact(
-        key=f"analysis-{session_id}",
+        key=f"analysis-{session_id[:8]}",
         markdown=md,
-        description=f"Session analysis for {session_id}",
+        description=f"Session analysis for {session_id[:8]}",
     )
-
     return artifact_id
 
 
 def create_improvements_artifact(session_id: str, analysis: Dict[str, Any]) -> str:
-    """
-    Create artifact for session improvements including prompt suggestions and action items.
+    """Create artifact for session improvements including prompt suggestions and action items."""
 
-    Args:
-        session_id: The Devin session ID
-        analysis: The analysis data from Devin
-
-    Returns:
-        The artifact ID
-    """
     md = "# 🚀 Session Improvements\n\n"
 
     # Add prompt improvements section
@@ -232,59 +208,67 @@ def create_improvements_artifact(session_id: str, analysis: Dict[str, Any]) -> s
         md += "*No specific improvements identified for this session.*\n"
 
     artifact_id = create_markdown_artifact(
-        key=f"improvements-{session_id}",
+        key=f"improvements-{session_id[:8]}",
         markdown=md,
-        description=f"Session improvements for {session_id}",
+        description=f"Session improvements for {session_id[:8]}",
     )
-
     return artifact_id
 
 
-def create_orchestration_summary_artifact(
-    session_id: str,
-    session_url: str,
-    analysis: dict,
-    execution_time: float,
-    title: Optional[str] = None,
-) -> str:
-    """
-    Create a comprehensive summary artifact for the entire orchestration.
+@task(name="process-session")
+def process_session(session_url: str) -> Dict[str, Any]:
+    """Process a single session."""
+    logger = get_run_logger()
 
-    Args:
-        session_id: The Devin session ID
-        session_url: The URL to the Devin session
-        analysis: The analysis data from Devin
-        execution_time: Total execution time in seconds
-        title: Optional title for the session
+    # Extract session ID from URL
+    session_id = session_url.split("/")[-1]
+    full_session_id = f"devin-{session_id}"
+    short_id = session_id[:8]
 
-    Returns:
-        The artifact ID
-    """
-    markdown_content = f"# Orchestration Summary\n\n"
-    markdown_content += f"**Session**: {title or 'Untitled'}\n"
-    markdown_content += f"**Session ID**: `{session_id}`\n"
-    markdown_content += f"**Execution Time**: {execution_time:.1f} seconds\n"
-    markdown_content += f"**Session URL**: [View Session]({session_url})\n\n"
+    logger.info(f"Fetching {short_id}...")
 
-    # Quick stats
-    issues_count = len(analysis.get("issues", []))
-    action_items_count = len(analysis.get("action_items", []))
-    timeline_count = len(analysis.get("timeline", []))
+    # Get API key and fetch
+    api_key = os.environ.get("DEVIN_API_KEY")
+    analysis = fetch_session_analysis(api_key, full_session_id)
 
-    markdown_content += "## Quick Stats\n\n"
-    markdown_content += f"- **Issues Found**: {issues_count}\n"
-    markdown_content += f"- **Action Items**: {action_items_count}\n"
-    markdown_content += f"- **Timeline Events**: {timeline_count}\n"
-    markdown_content += f"- **Has Suggested Prompt**: {'Yes' if analysis.get('suggested_prompt') else 'No'}\n\n"
+    if analysis:
+        logger.info(f"✅ Got analysis - {len(analysis.get('issues', []))} issues")
 
-    # Status
-    status = "✅ Completed With Analysis" if analysis else "⚠️ Completed (No Analysis)"
-    markdown_content += f"## Status\n\n{status}\n"
+        # Create two artifacts
+        timeline_id = create_timeline_artifact(session_id, session_url, analysis)
+        improvements_id = create_improvements_artifact(session_id, analysis)
 
-    artifact_id = create_markdown_artifact(
-        key=f"orchestration-summary-{session_id}",
-        markdown=markdown_content,
-        description=f"Complete orchestration summary for session {session_id}",
-    )
+        return {
+            "session_id": short_id,
+            "has_analysis": True,
+            "timeline_artifact": timeline_id,
+            "improvements_artifact": improvements_id,
+        }
+    else:
+        logger.warning(f"⚠️ No analysis for {short_id}")
+        return {"session_id": short_id, "has_analysis": False}
 
-    return artifact_id
+
+@flow(name="test-artifact-flow", log_prints=True)
+def test_artifact_flow():
+    """Simple test flow."""
+    logger = get_run_logger()
+
+    # The two test sessions
+    session_urls = [
+        "https://app.devin.ai/sessions/a2dfa695140f4f4697c357f74839dd9a",
+        "https://app.devin.ai/sessions/b4e5ec62741a40f2a48c6a71ce36d32a",
+    ]
+
+    logger.info("Starting test...")
+
+    # Process each session
+    for url in session_urls:
+        result = process_session(url)
+        logger.info(f"Result: {result}")
+
+    logger.info("Test complete!")
+
+
+if __name__ == "__main__":
+    test_artifact_flow()

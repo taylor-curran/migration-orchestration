@@ -20,7 +20,12 @@ import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
-from utils.artifacts import create_session_link_artifact
+from utils.artifacts import (
+    create_session_link_artifact,
+    create_timeline_artifact,
+    create_improvements_artifact,
+    create_orchestration_summary_artifact,
+)
 
 load_dotenv()
 
@@ -175,6 +180,7 @@ def run_session_and_wait_for_analysis(
         Dict containing session_id and analysis data
     """
     logger = get_run_logger()
+    start_time = time.time()
 
     # Setup
     if api_key is None:
@@ -195,7 +201,7 @@ def run_session_and_wait_for_analysis(
 
     # Step 2: Wait for blocked state
     logger.info(
-        f"[Step 2/4] Waiting for blocked state (max {config['blocked_wait'] // 60}m)..."
+        f"[Step 2/4] Waiting for blocked or finished state (max {config['blocked_wait'] // 60}m)..."
     )
     status = wait_for_status(
         api_key,
@@ -242,11 +248,41 @@ def run_session_and_wait_for_analysis(
 
     logger.info("✅ Orchestration complete!")
 
+    # Create artifacts with all the session analysis details
+    session_url = f"https://app.devin.ai/sessions/{session_id.replace('devin-', '')}"
+    if analysis:
+        logger.info("📄 Creating artifacts...")
+
+        # Create timeline artifact (issues and timeline)
+        create_timeline_artifact(session_id, session_url, analysis)
+
+        # Create improvements artifact (prompt suggestions and action items)
+        create_improvements_artifact(session_id, analysis)
+
+        # Create comprehensive summary artifact
+        execution_time = time.time() - start_time
+        create_orchestration_summary_artifact(
+            session_id=session_id,
+            session_url=session_url,
+            analysis=analysis,
+            execution_time=execution_time,
+            title=title,
+        )
+        logger.info("✅ Artifacts created successfully")
+
+    # Extract the improved prompt from nested structure
+    # API returns: {"suggested_prompt": {"suggested_prompt": "...", "original_prompt": "...", ...}}
+    suggested_prompt_data = analysis.get("suggested_prompt") if analysis else None
+    improved_prompt = None
+    if suggested_prompt_data and isinstance(suggested_prompt_data, dict):
+        improved_prompt = suggested_prompt_data.get("suggested_prompt")
+
     return {
         "session_id": session_id,
-        "session_url": f"https://app.devin.ai/sessions/{session_id.replace('devin-', '')}",
+        "session_url": session_url,
         "analysis": analysis,
-        "suggested_prompt": analysis.get("suggested_prompt"),
+        "suggested_prompt": improved_prompt,  # Now returns the actual improved prompt text
+        "suggested_prompt_data": suggested_prompt_data,  # Full data including original and improved
     }
 
 
