@@ -100,6 +100,8 @@ def create_timeline_artifact(
                 word in title.lower() for word in ["error", "fail", "issue"]
             ) and not any(word in title.lower() for word in ["fixed", "resolved"]):
                 emoji = "❌"  # Only use error emoji if NOT fixed/resolved
+            elif any(word in title.lower() for word in ["unnecessary"]):
+                emoji = "🐌"
             elif any(word in title.lower() for word in ["asks", "user"]):
                 emoji = "👤"
             elif any(word in title.lower() for word in ["select", "choose", "plan"]):
@@ -120,7 +122,7 @@ def create_timeline_artifact(
             elif any(word in title.lower() for word in ["pr ", "pull request", "push"]):
                 emoji = "📗"
             elif any(word in title.lower() for word in ["test"]) and any(
-                word in title.lower() for word in ["pass"]
+                word in title.lower() for word in ["pass", "implement", "improve", "increase"]
             ):
                 emoji = "📋"  # Tests passing
             elif any(
