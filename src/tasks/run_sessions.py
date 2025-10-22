@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-Simple orchestrator for Devin API sessions with session analysis.
+Simple orchestrator for Devin API sessions with structured output tracking.
 
 Workflow:
-1. Create session with prompt
-2. Wait for session to reach 'blocked' state
-3. Send message to move to 'sleeping' state
-4. Wait for session analysis to become available
+1. Create session with prompt (and optional structured output schema)
+2. Wait for 'blocked' state (tracking when structured output appears)
+3. Send sleep message to end session
+4. Collect analysis and final structured output
 """
 
 import os
 import time
 import httpx
+import json
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 from prefect import task
@@ -25,6 +26,7 @@ from utils.artifacts import (
     create_timeline_artifact,
     create_improvements_artifact,
     create_orchestration_summary_artifact,
+    create_structured_output_artifact,
 )
 
 load_dotenv()
@@ -34,13 +36,24 @@ DEFAULT_TIMEOUTS = {
     "blocked_wait": 2700,  # 45 minutes for session to reach blocked
     "sleeping_wait": 300,  # 5 minutes to switch to sleeping
     "analysis_wait": 420,  # 7 minutes for analysis to be ready
-    "poll_interval": 20,  # Check every 20 seconds
+    "poll_interval": 10,  # Check every 10 seconds (reduced for better structured output detection)
 }
 
 
-def create_session(api_key: str, prompt: str, title: Optional[str] = None) -> str:
-    """Create a new Devin session and return session_id."""
-
+def create_session(api_key: str, prompt: str, title: Optional[str] = None, structured_output_schema: Optional[Dict[str, Any]] = None) -> str:
+    """Create a new Devin session and return session_id.
+    
+    Args:
+        api_key: Devin API key
+        prompt: The task prompt for Devin
+        title: Optional session title  
+        structured_output_schema: Optional schema fields to add directly to request body
+    
+    Returns:
+        Session ID
+    """
+    logger = get_run_logger()
+    
     url = "https://api.devin.ai/v1/sessions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
@@ -49,15 +62,20 @@ def create_session(api_key: str, prompt: str, title: Optional[str] = None) -> st
         "title": title or "Orchestrated Session",
         "idempotent": False,
     }
+    
+    # Merge structured output schema fields directly into request body
+    if structured_output_schema:
+        data.update(structured_output_schema)
+        logger.debug(f"Added schema fields to request: {list(structured_output_schema.keys())}")
 
-    with httpx.Client() as client:
+    # Use longer timeout for API calls (30 seconds)
+    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
         response = client.post(url, headers=headers, json=data)
         response.raise_for_status()
 
     result = response.json()
     session_id = result["session_id"]
 
-    logger = get_run_logger()
     logger.info(f"✅ Session created: {session_id}")
     logger.info(f"   View at: {result['url']}")
 
@@ -72,7 +90,8 @@ def get_session_status(api_key: str, session_id: str) -> Dict[str, Any]:
     url = f"https://api.devin.ai/v1/sessions/{session_id}"
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    with httpx.Client() as client:
+    # Use longer timeout for API calls (30 seconds)
+    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
         response = client.get(url, headers=headers)
         response.raise_for_status()
 
@@ -81,18 +100,18 @@ def get_session_status(api_key: str, session_id: str) -> Dict[str, Any]:
 
 def send_sleep_message(api_key: str, session_id: str) -> None:
     """Send 'sleep' message to end the session and trigger analysis."""
-
+    logger = get_run_logger()
+    
     url = f"https://api.devin.ai/v1/sessions/{session_id}/message"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-
     data = {"message": "sleep"}
 
-    with httpx.Client() as client:
+    # Use longer timeout for API calls (30 seconds)
+    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
         response = client.post(url, headers=headers, json=data)
         response.raise_for_status()
 
-    logger = get_run_logger()
-    logger.info("📨 Sleep message sent - ending session")
+    logger.info("💤 Sleep message sent - session ending and analysis triggered")
 
 
 def wait_for_status(
@@ -101,18 +120,32 @@ def wait_for_status(
     target_statuses: list,
     timeout: int,
     poll_interval: int,
+    check_structured_output: bool = False,
 ) -> str:
-    """Wait for session to reach one of the target statuses."""
+    """Wait for session to reach one of the target statuses.
+    
+    Optionally also checks for structured output to see when it first appears.
+    """
 
     start_time = time.time()
-
+    logger = get_run_logger()
+    first_structured_output_time = None
+    
     while time.time() - start_time < timeout:
         details = get_session_status(api_key, session_id)
         status = details.get("status_enum")
 
         elapsed = int(time.time() - start_time)
-        logger = get_run_logger()
         logger.debug(f"   Status: {status} (elapsed: {elapsed}s)")
+        
+        # Check for structured output if requested
+        if check_structured_output and not first_structured_output_time:
+            structured_output = details.get("structured_output")
+            if structured_output:
+                first_structured_output_time = elapsed
+                logger.info(f"🎯 STRUCTURED OUTPUT FIRST APPEARED at {elapsed}s after session start!")
+                logger.info(f"   Session status: {status}")
+                logger.debug(f"   Output preview: {json.dumps(structured_output, indent=2)[:300]}...")
 
         if status in target_statuses:
             return status
@@ -128,7 +161,8 @@ def get_session_analysis(api_key: str, session_id: str) -> Optional[Dict[str, An
     url = f"https://api.devin.ai/beta/v2/enterprise/sessions/{session_id}"
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    with httpx.Client() as client:
+    # Use longer timeout for API calls (30 seconds)
+    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
         response = client.get(url, headers=headers)
         response.raise_for_status()
 
@@ -142,22 +176,35 @@ def wait_for_analysis(
     """Wait for session analysis to become available."""
 
     start_time = time.time()
+    logger = get_run_logger()
 
     while time.time() - start_time < timeout:
         analysis = get_session_analysis(api_key, session_id)
-
         elapsed = int(time.time() - start_time)
 
         if analysis:
-            logger = get_run_logger()
             logger.info(f"✅ Analysis available (elapsed: {elapsed}s)")
             return analysis
 
-        logger = get_run_logger()
         logger.debug(f"   Analysis not ready (elapsed: {elapsed}s)")
         time.sleep(poll_interval)
 
     raise TimeoutError(f"Session analysis not available within {timeout}s")
+
+
+def get_structured_output(api_key: str, session_id: str) -> Optional[Dict[str, Any]]:
+    """Get structured output from session if available."""
+    
+    url = f"https://api.devin.ai/v1/sessions/{session_id}"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    
+    # Use longer timeout for API calls (30 seconds)
+    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
+        response = client.get(url, headers=headers)
+        response.raise_for_status()
+    
+    session_data = response.json()
+    return session_data.get("structured_output")
 
 
 @task
@@ -166,18 +213,20 @@ def run_session_and_wait_for_analysis(
     title: Optional[str] = None,
     api_key: Optional[str] = None,
     timeouts: Optional[Dict[str, int]] = None,
+    structured_output_schema: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Main orchestration function that runs the complete workflow.
+    Main orchestration function that runs a Devin session and collects results.
 
     Args:
         prompt: The task prompt for Devin
         title: Optional session title
         api_key: Devin API key (uses env var if not provided)
         timeouts: Optional timeout overrides
+        structured_output_schema: Optional schema fields to add to request body
 
     Returns:
-        Dict containing session_id and analysis data
+        Dict containing session_id, session_url, analysis, suggested_prompt, and structured_output
     """
     logger = get_run_logger()
     start_time = time.time()
@@ -197,18 +246,24 @@ def run_session_and_wait_for_analysis(
 
     # Step 1: Create session
     logger.info("[Step 1/4] Creating session...")
-    session_id = create_session(api_key, prompt, title)
+    session_id = create_session(api_key, prompt, title, structured_output_schema)
 
-    # Step 2: Wait for blocked state
+    # Step 2: Wait for blocked state (and check for structured output if schema provided)
     logger.info(
         f"[Step 2/4] Waiting for blocked or finished state (max {config['blocked_wait'] // 60}m)..."
     )
+    
+    # Enable structured output checking if schema was provided
+    if structured_output_schema:
+        logger.info("   📊 Also checking for when structured output appears...")
+    
     status = wait_for_status(
         api_key,
         session_id,
         ["blocked", "finished", "expired"],  # Note: finished = sleeping
         config["blocked_wait"],
         config["poll_interval"],
+        check_structured_output=(structured_output_schema is not None),
     )
 
     if status != "blocked":
@@ -238,13 +293,23 @@ def run_session_and_wait_for_analysis(
         if status != "finished":  # finished = sleeping
             raise ValueError(f"Session ended with status: {status}")
 
-    # Step 4: Wait for session analysis
+    # Step 4: Wait for session analysis and get final structured output
     logger.info(
         f"[Step 4/4] Waiting for session analysis (max {config['analysis_wait'] // 60}m)..."
     )
     analysis = wait_for_analysis(
         api_key, session_id, config["analysis_wait"], config["poll_interval"]
     )
+    
+    # Get final structured output if schema was provided
+    structured_output = None
+    if structured_output_schema:
+        logger.info("   Getting final structured output...")
+        structured_output = get_structured_output(api_key, session_id)
+        if structured_output:
+            logger.info("   ✅ Final structured output retrieved")
+        else:
+            logger.warning("   ⚠️  No structured output available at session end")
 
     logger.info("✅ Orchestration complete!")
 
@@ -268,6 +333,12 @@ def run_session_and_wait_for_analysis(
             execution_time=execution_time,
             title=title,
         )
+        
+        # Create structured output artifact if available
+        if structured_output:
+            create_structured_output_artifact(session_id, structured_output)
+            logger.info("✅ Structured output artifact created")
+        
         logger.info("✅ Artifacts created successfully")
 
     # Extract the improved prompt from nested structure
@@ -283,6 +354,7 @@ def run_session_and_wait_for_analysis(
         "analysis": analysis,
         "suggested_prompt": improved_prompt,  # Now returns the actual improved prompt text
         "suggested_prompt_data": suggested_prompt_data,  # Full data including original and improved
+        "structured_output": structured_output,  # Structured output from the session
     }
 
 

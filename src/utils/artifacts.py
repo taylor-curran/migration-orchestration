@@ -3,8 +3,9 @@ Artifact utilities for the migration orchestration project.
 Provides helper functions for creating various types of Prefect artifacts.
 """
 
-from prefect.artifacts import create_link_artifact, create_markdown_artifact
-from typing import Optional, Dict, Any
+from prefect.artifacts import create_link_artifact, create_markdown_artifact, create_table_artifact
+from typing import Optional, Dict, Any, List
+import json
 
 
 def create_session_link_artifact(
@@ -100,7 +101,7 @@ def create_timeline_artifact(
                 word in title.lower() for word in ["error", "fail", "issue"]
             ) and not any(word in title.lower() for word in ["fixed", "resolved"]):
                 emoji = "❌"  # Only use error emoji if NOT fixed/resolved
-            elif any(word in title.lower() for word in ["unnecessary"]):
+            elif any(word in title.lower() for word in ["unnecessary", "waste"]):
                 emoji = "🐌"
             elif any(word in title.lower() for word in ["asks", "user"]):
                 emoji = "👤"
@@ -122,7 +123,8 @@ def create_timeline_artifact(
             elif any(word in title.lower() for word in ["pr ", "pull request", "push"]):
                 emoji = "📗"
             elif any(word in title.lower() for word in ["test"]) and any(
-                word in title.lower() for word in ["pass", "implement", "improve", "increase"]
+                word in title.lower()
+                for word in ["pass", "implement", "improve", "increase"]
             ):
                 emoji = "📋"  # Tests passing
             elif any(
@@ -289,4 +291,87 @@ def create_orchestration_summary_artifact(
         description=f"Complete orchestration summary for session {session_id}",
     )
 
+    return artifact_id
+
+
+def create_structured_output_artifact(
+    session_id: str, structured_output: Dict[str, Any]
+) -> str:
+    """
+    Create a table artifact for structured output from a Devin session.
+    Dynamically handles any structure without hardcoding field names.
+    
+    Args:
+        session_id: The Devin session ID
+        structured_output: The structured output data from the session
+    
+    Returns:
+        The artifact ID
+    """
+    if not structured_output:
+        # Handle empty output - return None to indicate no artifact created
+        return None
+    
+    # Check if we have a list at the top level (rare but possible)
+    if isinstance(structured_output, list):
+        # If it's a list of dicts, use it directly as table
+        if structured_output and isinstance(structured_output[0], dict):
+            artifact_id = create_table_artifact(
+                key=f"structured-output-{session_id}",
+                table=structured_output,
+                description=f"Structured output from session {session_id}"
+            )
+        else:
+            # List of primitives, create index-value table
+            table_data = [{"Index": str(i), "Value": str(v)} for i, v in enumerate(structured_output)]
+            artifact_id = create_table_artifact(
+                key=f"structured-output-{session_id}",
+                table=table_data,
+                description=f"Structured output from session {session_id}"
+            )
+        return artifact_id
+    
+    # Find if any top-level value is a non-empty list of dicts (could be used as a table)
+    list_candidates = {}
+    for key, value in structured_output.items():
+        if isinstance(value, list) and value and isinstance(value[0], dict):
+            list_candidates[key] = value
+    
+    # If we have exactly one list of dicts, use it as the primary table
+    if len(list_candidates) == 1:
+        list_key, list_value = next(iter(list_candidates.items()))
+        # Add index column and flatten nested structures if needed
+        table_data = []
+        for i, item in enumerate(list_value, 1):
+            row = {"#": str(i)}
+            for k, v in item.items():
+                # Convert complex values to JSON strings for display
+                if isinstance(v, (dict, list)):
+                    row[k] = json.dumps(v, indent=2)
+                else:
+                    row[k] = str(v)
+            table_data.append(row)
+        
+        artifact_id = create_table_artifact(
+            key=f"structured-output-{list_key}-{session_id}",
+            table=table_data,
+            description=f"Structured output ({list_key}) from session {session_id}"
+        )
+    else:
+        # Generic key-value table for all fields
+        table_data = []
+        for key, value in structured_output.items():
+            # Convert complex values to JSON string for readability
+            if isinstance(value, (dict, list)):
+                value_str = json.dumps(value, indent=2)
+            else:
+                value_str = str(value)
+            table_data.append({"Field": key, "Value": value_str})
+        
+        artifact_id = create_table_artifact(
+            key=f"structured-output-{session_id}",
+            table=table_data if table_data else [{"Field": "No data", "Value": "Empty output"}],
+            description=f"Structured output from session {session_id}"
+        )
+    
     return artifact_id
