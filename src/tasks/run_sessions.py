@@ -40,20 +40,25 @@ DEFAULT_TIMEOUTS = {
 }
 
 
-def create_session(api_key: str, prompt: str, title: Optional[str] = None, structured_output_schema: Optional[Dict[str, Any]] = None) -> str:
+def create_session(
+    api_key: str,
+    prompt: str,
+    title: Optional[str] = None,
+    structured_output_schema: Optional[Dict[str, Any]] = None,
+) -> str:
     """Create a new Devin session and return session_id.
-    
+
     Args:
         api_key: Devin API key
         prompt: The task prompt for Devin
-        title: Optional session title  
+        title: Optional session title
         structured_output_schema: Optional schema fields to add directly to request body
-    
+
     Returns:
         Session ID
     """
     logger = get_run_logger()
-    
+
     url = "https://api.devin.ai/v1/sessions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
@@ -62,11 +67,13 @@ def create_session(api_key: str, prompt: str, title: Optional[str] = None, struc
         "title": title or "Orchestrated Session",
         "idempotent": False,
     }
-    
+
     # Merge structured output schema fields directly into request body
     if structured_output_schema:
         data.update(structured_output_schema)
-        logger.debug(f"Added schema fields to request: {list(structured_output_schema.keys())}")
+        logger.debug(
+            f"Added schema fields to request: {list(structured_output_schema.keys())}"
+        )
 
     # Use longer timeout for API calls (30 seconds)
     with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
@@ -101,7 +108,7 @@ def get_session_status(api_key: str, session_id: str) -> Dict[str, Any]:
 def send_sleep_message(api_key: str, session_id: str) -> None:
     """Send 'sleep' message to end the session and trigger analysis."""
     logger = get_run_logger()
-    
+
     url = f"https://api.devin.ai/v1/sessions/{session_id}/message"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     data = {"message": "sleep"}
@@ -123,29 +130,33 @@ def wait_for_status(
     check_structured_output: bool = False,
 ) -> str:
     """Wait for session to reach one of the target statuses.
-    
+
     Optionally also checks for structured output to see when it first appears.
     """
 
     start_time = time.time()
     logger = get_run_logger()
     first_structured_output_time = None
-    
+
     while time.time() - start_time < timeout:
         details = get_session_status(api_key, session_id)
         status = details.get("status_enum")
 
         elapsed = int(time.time() - start_time)
         logger.debug(f"   Status: {status} (elapsed: {elapsed}s)")
-        
+
         # Check for structured output if requested
         if check_structured_output and not first_structured_output_time:
             structured_output = details.get("structured_output")
             if structured_output:
                 first_structured_output_time = elapsed
-                logger.info(f"🎯 STRUCTURED OUTPUT FIRST APPEARED at {elapsed}s after session start!")
+                logger.info(
+                    f"🎯 STRUCTURED OUTPUT FIRST APPEARED at {elapsed}s after session start!"
+                )
                 logger.info(f"   Session status: {status}")
-                logger.debug(f"   Output preview: {json.dumps(structured_output, indent=2)[:300]}...")
+                logger.debug(
+                    f"   Output preview: {json.dumps(structured_output, indent=2)[:300]}..."
+                )
 
         if status in target_statuses:
             return status
@@ -194,15 +205,15 @@ def wait_for_analysis(
 
 def get_structured_output(api_key: str, session_id: str) -> Optional[Dict[str, Any]]:
     """Get structured output from session if available."""
-    
+
     url = f"https://api.devin.ai/v1/sessions/{session_id}"
     headers = {"Authorization": f"Bearer {api_key}"}
-    
+
     # Use longer timeout for API calls (30 seconds)
     with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
         response = client.get(url, headers=headers)
         response.raise_for_status()
-    
+
     session_data = response.json()
     return session_data.get("structured_output")
 
@@ -252,11 +263,11 @@ def run_session_and_wait_for_analysis(
     logger.info(
         f"[Step 2/4] Waiting for blocked or finished state (max {config['blocked_wait'] // 60}m)..."
     )
-    
+
     # Enable structured output checking if schema was provided
     if structured_output_schema:
         logger.info("   📊 Also checking for when structured output appears...")
-    
+
     status = wait_for_status(
         api_key,
         session_id,
@@ -300,7 +311,7 @@ def run_session_and_wait_for_analysis(
     analysis = wait_for_analysis(
         api_key, session_id, config["analysis_wait"], config["poll_interval"]
     )
-    
+
     # Get final structured output if schema was provided
     structured_output = None
     if structured_output_schema:
@@ -333,12 +344,12 @@ def run_session_and_wait_for_analysis(
             execution_time=execution_time,
             title=title,
         )
-        
+
         # Create structured output artifact if available
         if structured_output:
             create_structured_output_artifact(session_id, structured_output)
             logger.info("✅ Structured output artifact created")
-        
+
         logger.info("✅ Artifacts created successfully")
 
     # Extract the improved prompt from nested structure

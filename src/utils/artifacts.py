@@ -3,7 +3,11 @@ Artifact utilities for the migration orchestration project.
 Provides helper functions for creating various types of Prefect artifacts.
 """
 
-from prefect.artifacts import create_link_artifact, create_markdown_artifact, create_table_artifact
+from prefect.artifacts import (
+    create_link_artifact,
+    create_markdown_artifact,
+    create_table_artifact,
+)
 from typing import Optional, Dict, Any, List
 import json
 
@@ -300,18 +304,18 @@ def create_structured_output_artifact(
     """
     Create a table artifact for structured output from a Devin session.
     Dynamically handles any structure without hardcoding field names.
-    
+
     Args:
         session_id: The Devin session ID
         structured_output: The structured output data from the session
-    
+
     Returns:
         The artifact ID
     """
     if not structured_output:
         # Handle empty output - return None to indicate no artifact created
         return None
-    
+
     # Check if we have a list at the top level (rare but possible)
     if isinstance(structured_output, list):
         # If it's a list of dicts, use it directly as table
@@ -319,24 +323,27 @@ def create_structured_output_artifact(
             artifact_id = create_table_artifact(
                 key=f"structured-output-{session_id}",
                 table=structured_output,
-                description=f"Structured output from session {session_id}"
+                description=f"Structured output from session {session_id}",
             )
         else:
             # List of primitives, create index-value table
-            table_data = [{"Index": str(i), "Value": str(v)} for i, v in enumerate(structured_output)]
+            table_data = [
+                {"Index": str(i), "Value": str(v)}
+                for i, v in enumerate(structured_output)
+            ]
             artifact_id = create_table_artifact(
                 key=f"structured-output-{session_id}",
                 table=table_data,
-                description=f"Structured output from session {session_id}"
+                description=f"Structured output from session {session_id}",
             )
         return artifact_id
-    
+
     # Find if any top-level value is a non-empty list of dicts (could be used as a table)
     list_candidates = {}
     for key, value in structured_output.items():
         if isinstance(value, list) and value and isinstance(value[0], dict):
             list_candidates[key] = value
-    
+
     # If we have exactly one list of dicts, use it as the primary table
     if len(list_candidates) == 1:
         list_key, list_value = next(iter(list_candidates.items()))
@@ -351,11 +358,11 @@ def create_structured_output_artifact(
                 else:
                     row[k] = str(v)
             table_data.append(row)
-        
+
         artifact_id = create_table_artifact(
             key=f"structured-output-{list_key}-{session_id}",
             table=table_data,
-            description=f"Structured output ({list_key}) from session {session_id}"
+            description=f"Structured output ({list_key}) from session {session_id}",
         )
     else:
         # Generic key-value table for all fields
@@ -367,11 +374,13 @@ def create_structured_output_artifact(
             else:
                 value_str = str(value)
             table_data.append({"Field": key, "Value": value_str})
-        
+
         artifact_id = create_table_artifact(
             key=f"structured-output-{session_id}",
-            table=table_data if table_data else [{"Field": "No data", "Value": "Empty output"}],
-            description=f"Structured output from session {session_id}"
+            table=table_data
+            if table_data
+            else [{"Field": "No data", "Value": "Empty output"}],
+            description=f"Structured output from session {session_id}",
         )
-    
+
     return artifact_id

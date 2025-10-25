@@ -12,16 +12,14 @@ import json
 
 @flow(log_prints=True)
 def test_quick_structured_output(
-    prompt: str,
-    title: str,
-    structured_output_schema: Optional[Dict[str, Any]] = None
+    prompt: str, title: str, structured_output_schema: Optional[Dict[str, Any]] = None
 ):
     """
     Run a quick test with structured output.
-    
+
     Args:
         prompt: The task prompt for Devin
-        title: Session title  
+        title: Session title
         structured_output_schema: Schema fields to include in request body
     """
     result = run_session_and_wait_for_analysis(
@@ -35,15 +33,11 @@ def test_quick_structured_output(
 if __name__ == "__main__":
     # Simple schema for a quick analysis task
     structured_output_schema = {
-        "result": {
-            "fibonacci_10": None,
-            "is_prime_17": None,
-            "factorial_5": None
-        },
+        "result": {"fibonacci_10": None, "is_prime_17": None, "factorial_5": None},
         "status": "not_started",
-        "completion_percentage": 0
+        "completion_percentage": 0,
     }
-    
+
     # Simple, fast-completing prompt that references the schema
     prompt = """
 !ask Complete this quick math analysis task.
@@ -58,29 +52,29 @@ Please provide structured output in this exact JSON format by updating the field
 
 This is a simple test - just calculate and update the structured output immediately.
 """
-    
+
     title = "Quick Structured Output Test - Math"
 
     # Run the test
     print("🚀 Starting quick structured output test...")
-    print(f"📋 Schema being sent in request body: {json.dumps(structured_output_schema, indent=2)}\n")
-    
-    result = test_quick_structured_output(
-        prompt=prompt,
-        title=title, 
-        structured_output_schema=structured_output_schema
+    print(
+        f"📋 Schema being sent in request body: {json.dumps(structured_output_schema, indent=2)}\n"
     )
-    
+
+    result = test_quick_structured_output(
+        prompt=prompt, title=title, structured_output_schema=structured_output_schema
+    )
+
     # Display results
     if result:
         print("\n✅ Session completed successfully")
-        
+
         if result.get("structured_output"):
             print("\n📊 Structured Output Retrieved:")
             print(json.dumps(result["structured_output"], indent=2))
         else:
             print("\n⚠️ No structured output found in response")
-            
+
         if result.get("session_analysis"):
             print("\n📝 Session Analysis:")
             print(json.dumps(result["session_analysis"], indent=2))
