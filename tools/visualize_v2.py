@@ -62,7 +62,22 @@ def load_migration_plan(file_path: str = None) -> Dict[str, Any]:
     elif hasattr(module, 'migration_plan_graph'):
         return module.migration_plan_graph
     else:
-        print("❌ File doesn't contain 'migration_plan' or 'migration_plan_graph' variable")
+        # Fallback to alternative locations if default file lacks required variables
+        alternatives = [
+            PROJECT_ROOT / "migration_plan.py",
+            PROJECT_ROOT.parent / "target-springboot-cics" / "migration_plan.py",
+        ]
+        for alt in alternatives:
+            if alt.exists():
+                print(f"🔍 Default plan missing variables, trying alternative: {alt}")
+                spec_alt = importlib.util.spec_from_file_location("migration_plan_alt", alt)
+                module_alt = importlib.util.module_from_spec(spec_alt)
+                spec_alt.loader.exec_module(module_alt)
+                if hasattr(module_alt, 'migration_plan'):
+                    return module_alt.migration_plan
+                if hasattr(module_alt, 'migration_plan_graph'):
+                    return module_alt.migration_plan_graph
+        print("❌ Could not find a valid migration plan in default or alternatives")
         return None
 
 

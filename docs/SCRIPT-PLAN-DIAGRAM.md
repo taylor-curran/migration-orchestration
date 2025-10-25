@@ -6,13 +6,21 @@ graph TD
     classDef analysis fill:#87CEEB,stroke:#333,stroke-width:2px
     classDef human fill:#FFB6C1,stroke:#333,stroke-width:2px
     
-    %% Nodes
-    prompt1["Prompt: Hard Coded<br/>+ Params"]:::prompt
-    planner["Planner Graph Build/Refine<br/>Session"]:::session
-    prompt2["Prompt: Hard Coded<br/>+ Params"]:::prompt
+    %% Initial build phase
+    prompt0["Prompt Hard Coded"]:::prompt
+    buildSession["Planner Graph Build Session"]:::session
+    
+    %% Update/Refine phase
+    prompt1["Prompt Hard Coded + Params"]:::prompt
+    updateSession["Planner Graph Update/Refine<br/>Session"]:::session
+    
+    %% Plan audit phase
+    prompt2["Prompt Hard Coded + Params"]:::prompt
     audit["Plan Audit and Select Work-Batch<br/>Session"]:::session
     hil1((HIL)):::human
-    prompt3["Prompt: Hard Coded<br/>+ Params"]:::prompt
+    
+    %% Generate prompts phase
+    prompt3["Prompt Hard Coded + Params"]:::prompt
     generate["Generate Prompts for Each<br/>Parallel Session Session"]:::session
     
     %% Generated prompts
@@ -31,13 +39,15 @@ graph TD
     analysisB2["Session Analysis"]:::analysis
     
     %% Final audit
-    prompt4["Prompt: Hard Coded<br/>+ Params"]:::prompt
+    prompt4["Prompt Hard Coded + Params"]:::prompt
     finalAudit["Audit Work Session"]:::session
     hil2((HIL)):::human
     
     %% Connections
-    prompt1 --> planner
-    planner --> prompt2
+    prompt0 --> buildSession
+    buildSession -->|Initiate<br/>Orchestration| prompt2
+    prompt1 --> updateSession
+    updateSession --> prompt2
     prompt2 --> audit
     audit <--> hil1
     audit --> prompt3
@@ -62,6 +72,6 @@ graph TD
     prompt4 --> finalAudit
     finalAudit <--> hil2
     
-    %% Loop back arrow from final audit to planner
+    %% Loop back arrow from final audit to update/refine
     finalAudit -.-> prompt1
 ```
