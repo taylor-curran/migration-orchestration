@@ -1,197 +1,222 @@
-# Migration Analysis Prompt - Stability-First Parallel Execution
+# Migration Plan Task Graph Generation
 
-Analyze source repository at `[source_path]` and target repository at `[target_path]` to create a migration plan that prioritizes stability through continuous validation and feedback loops.
+## Migration Parameters
 
-## Core Philosophy
+- **Source Repository**: `[SOURCE_REPO]` (e.g., taylor-curran/og-cics-cobol-app)
+- **Target Repository**: `[TARGET_REPO]` (e.g., taylor-curran/target-springboot-cics)
 
-**Stability Over Speed**: Never sacrifice validation for velocity. Every parallel group must be followed by validation and learning.
+## YOUR MISSION
 
-**Continuous Feedback**: Build in monitoring, validation, and adaptation points throughout - not just at the end.
+Generate a task graph for migrating from source to target repository. Each task is a working session for an agent. Analyze both repos to understand current state and what needs migration.
 
-**Learn and Adapt**: After each parallel group, we audit results and adjust the next phase based on learnings.
+## THE GOLDEN RULE: Build Validation Before Migration
 
-## Core Requirements
+**Every migration task MUST have measurable validation. If validation doesn't exist, CREATE IT FIRST.**
 
-**Task Sizing**: Each task 0.5-1 day. Add 30-50% buffer for complex operations. Be honest about complexity - underestimation kills projects.
+This means:
+- **Tests come before code**: Can't migrate without tests to verify correctness
+- **Metrics come before claims**: Can't claim "within 10% performance" without baseline metrics
+- **Coverage comes before completion**: Can't declare done without coverage reports
 
-**Validation First**: Every task must define how we know it succeeded. No task is complete without validation.
+The dependency chain should always look like:
+```
+[Setup Infrastructure] → [Create Tests] → [Migrate Code Using Tests]
+                     ↗                  ↗
+[Establish Baselines]                   
+```
 
-**Dependency Clarity**: Explicit dependencies enable parallelization. Every task states what it needs and what needs it.
+Never:
+```
+[Migrate Code] → [Write Tests After]  ❌ WRONG
+```
 
-## Analysis Steps
-
-### 1. Observability & Baselines (ABSOLUTELY FIRST)
-Before touching ANY code, establish your eyes and ears:
-- **pre_000**: Performance baseline - measure EVERYTHING (latency, throughput, error rates)
-- **Monitoring/alerting**: Real-time dashboards, anomaly detection, alert thresholds
-- **Audit trail framework**: Every financial operation must be traceable
-- **Continuous validation hooks**: Build the infrastructure to validate as you go
-- **Why**: You can't improve what you can't measure. You can't debug what you can't see.
-
-### 2. Infrastructure Foundation
-After observability, build the foundation:
-- Authentication/authorization framework
-- Session management 
-- Database connection pools (sized based on actual patterns from baseline)
-- Shared services (ID generation with proper atomicity)
-- UI component library
-- Network configuration for gradual rollout
-
-### 3. Dependency Mapping 
-Map TRUE dependencies that prevent parallelization:
-- **Data dependencies**: Task B needs data created by Task A
-- **Service dependencies**: Task B calls service created by Task A  
-- **Cascade dependencies**: Delete operations need their target operations first
-- **Infrastructure dependencies**: Business logic needs framework setup first
-- **WRONG**: Don't create artificial dependencies between unrelated tasks
-
-### 4. Parallel Group Identification with Validation Gates
-Group tasks that can run in parallel, BUT each group must include:
-- **Parallel tasks**: What can run together (read-only ops, different entities, independent workflows)
-- **Validation gate**: What we validate after this group completes
-- **Learning checkpoint**: What we might discover that changes the next group
-- **Resource limits**: Max 2-3 parallel to avoid exhaustion
-- **Example**: "Phase 1: Read Ops" → Validate performance → Learn actual latencies → Adjust Phase 2 estimates
-
-### 5. Continuous Validation Strategy (NOT JUST CHECKPOINTS)
-Build validation INTO the migration, not after:
-- **During migration**: Real-time monitoring, continuous data validation
-- **After each task**: Automated tests, performance checks, data consistency
-- **After each group**: Comprehensive validation before proceeding
-- **Dual-write validation**: Both systems write, continuous comparison, zero tolerance for discrepancies
-- **Rollback triggers**: Define specific metrics that force a rollback
-
-### 6. Feedback Loop Architecture
-After EVERY parallel group:
-- **What worked**: Actual hours vs estimated, performance vs baseline
-- **What didn't**: Unexpected dependencies, complexity underestimation  
-- **What we learned**: New patterns, better approaches
-- **How we adapt**: Update next phase estimates, adjust parallelization
-- **This is NOT optional**: Plans that don't adapt are plans that fail
-
-## Required Output Format
+## Task Node Structure
 
 ```python
-migration_plan_graph = {
-  "migration_plan": {
-    "pre_migration_tasks": [
-      {
-        "id": "pre_000",  # ALWAYS start with observability
-        "content": "Establish performance baseline and monitoring infrastructure",
-        "type": "baseline",
-        "estimated_hours": 12,
-        "validation": "Dashboards live, baseline documented, alerts configured",
-        "blocks": ["val_performance"],
-        "deliverables": ["baseline_metrics.md", "dashboard_urls.txt", "alert_rules.yaml"]
-      }
-    ],
-    "migration_tasks": [
-      {
-        "id": "mig_001",
-        "content": "Migrate CustomerService read operations",
-        "complexity": "low",
-        "estimated_hours": 6,
-        "depends_on": ["pre_000", "pre_001"],  # Need monitoring first!
-        "can_parallel_with": ["mig_005"],  
-        "validation_steps": [
-          "Unit tests pass (80% coverage)",
-          "Performance within 10% of baseline",
-          "Zero data discrepancies in validation run"
-        ],
-        "continuous_validation": "Real-time comparison with legacy during dual-read",
-        "rollback_strategy": "Feature flag to legacy, rollback if error rate > 0.1%"
-      }
-    ],
-    "validation_tasks": [
-      {
-        "id": "val_continuous_001",
-        "content": "Continuous validation during Phase 1 dual-read period",
-        "type": "continuous",  # Runs throughout, not just at end
-        "depends_on": ["mig_001", "mig_005"],
-        "success_criteria": "Real-time dashboard shows zero discrepancies",
-        "monitors": ["Latency comparison", "Data consistency", "Error rates"]
-      }
-    ]
-  },
-  
-  # CRITICAL: Define clear parallel execution groups with validation gates
-  "parallel_groups": [
-    {
-      "name": "Phase 1: Read Operations",
-      "task_ids": ["mig_001", "mig_005"],
-      "max_parallel": 2,
-      "rationale": "Both read-only, different data stores, no shared state",
-      
-      # VALIDATION GATE - What happens after this group
-      "validation_after": {
-        "continuous": "val_continuous_001",  # Running during execution
-        "gate": "checkpoint_1",  # Must pass before next group
-        "duration": "24-48 hours dual-read validation"
-      },
-      
-      # LEARNING CHECKPOINT - How we adapt
-      "expected_learnings": [
-        "Actual performance vs baseline",
-        "Unexpected data patterns",
-        "Resource utilization reality"
-      ],
-      "adapts": "Phase 2 estimates and parallelization"
-    }
-  ],
-  
-  "critical_path": ["pre_000", "pre_001", "mig_001", "val_continuous_001"],
-  
-  "checkpoints": [
-    {
-      "id": "checkpoint_1",
-      "after_groups": ["Phase 1"],
-      "validation": "Read ops validated with continuous monitoring",
-      "metrics_required": [
-        "P95 latency within 10% of baseline",
-        "Zero data discrepancies over 24 hours",
-        "Error rate < 0.01%"
-      ],
-      "proceed_if": "All metrics met",
-      "rollback_if": "Any metric fails",
-      "learnings_to_document": [
-        "Actual hours vs estimated",
-        "Performance characteristics",
-        "Discovered dependencies"
-      ]
-    }
-  ]
+{
+    "id": "unique_id",  # setup_*, validator_*, migrate_*
+    "title": "Short descriptive title",
+    "content": "What this working session accomplishes",
+    "depends_on": ["task_ids"],  # Dependencies define execution order
+    "prompt": "Complete prompt for agent (include ALL context, repo names, file paths)",
+    "definition_of_done": "Clear, measurable success criteria",
+    "validation_mechanism": "How to concretely test, validate, sanity check, cross reference (tests, data quality metrics, observability metrics and data, coverage) - NOT just code review",
+    "estimated_hours": 8,  # Target: 6-12 hours per task
+    "deliverables": ["concrete_outputs.java"]  # Optional: specific files produced
 }
 ```
 
-## Key Output Principles
+## Task Categories and Sequencing
 
-### Stability & Monitoring First
-- **pre_000 ALWAYS first**: Can't validate "within 10% of legacy" without baseline
-- **Observability before code**: Build monitoring/alerting infrastructure first
-- **Continuous validation**: Not just checkpoints - real-time monitoring throughout
-- **Zero tolerance**: Financial data requires ZERO discrepancies, not percentages
+### 1. Setup Tasks (First)
+Infrastructure and baselines that everything depends on:
+- Performance baseline measurement
+- Monitoring/observability setup
+- Development environment setup
+- CI/CD pipeline configuration
 
-### Parallel Execution with Validation Gates
-- **CAN parallelize**: Read operations, different entities, independent UI screens
-- **CANNOT parallelize**: Shared counters, cascade operations, distributed transactions  
-- **Resource limits**: Max 2-3 parallel tasks to avoid exhaustion
-- **ALWAYS validate after parallel group**: Never proceed without validation
+### 2. Validator Tasks (Before Each Migration)
+Create validation mechanisms BEFORE the code they will validate:
+- Integration test suites
+- Performance benchmarks
+- Data comparison tools
+- Coverage configuration
+- Acceptance test scenarios
 
-### Feedback Loops Are Mandatory
-- **After each group**: Document what worked, what didn't, what we learned
-- **Adapt the plan**: Update estimates, adjust parallelization based on learnings
-- **Continuous over batch**: Continuous validation reveals issues immediately
-- **Plans that don't adapt are plans that fail**
+### 3. Migration Tasks (After Validators)
+The actual migration work, which DEPENDS ON validators:
+- Code translation
+- API implementation
+- Data migration
+- Integration work
 
-### Honest Complexity Assessment
-- **Add 30-50% buffer** to complex tasks - optimism kills projects
-- **Document uncertainty**: Flag tasks where estimates are guesses
-- **Learn from actuals**: First task in a category informs others
-- **Infrastructure takes time**: Don't underestimate setup tasks
+## Dependency Rules
 
-### Validation Is Not Optional
-- **Every task**: Define success criteria before starting
-- **Every group**: Gate before proceeding to next phase
-- **Continuous monitoring**: Real-time dashboards, not just end-of-phase checks
-- **Rollback triggers**: Define specific metrics that force rollback
-- **If you can't measure it, you can't migrate it**
+1. **Migration tasks MUST depend on their validators**: If `migrate_customer` needs tests, then `validator_customer_tests` must be a dependency
+2. **Validators can depend on other validators**: Build incrementally (e.g., CRUD tests extend read-only tests)
+3. **Setup tasks have no dependencies**: They establish the foundation
+4. **No circular dependencies**: The graph must be a DAG
+
+## Task Granularity
+
+- **Target: 6-12 hours** per task
+- **Maximum: 20 hours** (split if larger)
+- **Minimum: 4 hours** (combine if smaller)
+
+Split when:
+- Work exceeds 12 hours with natural breakpoints
+- Different validation mechanisms are needed
+- Output enables parallel downstream work
+
+## Example Task Graph (SHOWING CORRECT SEQUENCING)
+
+```python
+{
+    "tasks": [
+        # SETUP PHASE - Foundation
+        {
+            "id": "setup_001",
+            "title": "Establish Performance Baseline",
+            "content": "Measure legacy system performance for all programs",
+            "depends_on": [],
+            "prompt": "Analyze [SOURCE_REPO]. Measure P50/P95/P99 latencies for all programs. Document baseline metrics.",
+            "definition_of_done": "Baseline metrics documented for all programs",
+            "validation_mechanism": "Metrics report covers all programs with specific numbers",
+            "estimated_hours": 10,
+            "deliverables": ["baseline_metrics.md", "performance_data.json"]
+        },
+        {
+            "id": "setup_002",
+            "title": "Setup Target Monitoring",
+            "content": "Deploy monitoring stack for target system",
+            "depends_on": [],
+            "prompt": "Setup monitoring for [TARGET_REPO]. Deploy Prometheus, Grafana, configure dashboards.",
+            "definition_of_done": "Monitoring operational and collecting metrics",
+            "validation_mechanism": "Dashboards showing live data, alerts configured",
+            "estimated_hours": 8,
+            "deliverables": ["monitoring_config.yaml", "dashboard_urls.txt"]
+        },
+        
+        # VALIDATOR PHASE - Build tests BEFORE migration
+        {
+            "id": "validator_001",
+            "title": "Create Customer Read Test Suite",
+            "content": "Build tests for customer inquiry operations",
+            "depends_on": ["setup_002"],  # Needs monitoring to verify test execution
+            "prompt": "Create integration tests for customer read operations. Test both [SOURCE_REPO] and future [TARGET_REPO] endpoints. Setup JaCoCo coverage. Create 30+ test cases.",
+            "definition_of_done": "Test suite ready with 30+ tests, JaCoCo integrated",
+            "validation_mechanism": "Tests run successfully against legacy, coverage reports generated",
+            "estimated_hours": 10,
+            "deliverables": ["CustomerReadTests.java", "test_fixtures.json", "jacoco.gradle"]
+        },
+        {
+            "id": "validator_002", 
+            "title": "Create Customer CRUD Test Suite",
+            "content": "Build tests for customer create/update/delete",
+            "depends_on": ["validator_001"],  # Extends read tests
+            "prompt": "Extend validator_001 tests. Add 50+ CRUD tests including transactions, rollbacks, concurrency. These will validate migrate_002.",
+            "definition_of_done": "CRUD tests ready, transaction scenarios covered",
+            "validation_mechanism": "Tests execute against legacy system successfully",
+            "estimated_hours": 10,
+            "deliverables": ["CustomerCrudTests.java", "transaction_fixtures.sql"]
+        },
+        
+        # MIGRATION PHASE - Migrate USING the tests
+        {
+            "id": "migrate_001",
+            "title": "Migrate Customer Read Operations",
+            "content": "Implement customer inquiry endpoints",
+            "depends_on": ["setup_001", "setup_002", "validator_001"],  # DEPENDS on tests!
+            "prompt": "Migrate customer read from [SOURCE_REPO] to [TARGET_REPO]. Run validator_001 tests continuously. Match legacy behavior exactly.",
+            "definition_of_done": "All read operations migrated, tests passing",
+            "validation_mechanism": "validator_001 tests pass, JaCoCo shows 90%+ coverage",
+            "estimated_hours": 8,
+            "deliverables": ["CustomerReadController.java", "CustomerReadService.java"]
+        },
+        {
+            "id": "migrate_002",
+            "title": "Migrate Customer CRUD Operations", 
+            "content": "Implement customer create/update/delete",
+            "depends_on": ["migrate_001", "validator_002"],  # DEPENDS on CRUD tests!
+            "prompt": "Migrate customer CRUD from [SOURCE_REPO] to [TARGET_REPO]. Run validator_002 tests continuously. Preserve transaction boundaries.",
+            "definition_of_done": "CRUD operations migrated, transaction handling correct",
+            "validation_mechanism": "validator_002 tests pass, JaCoCo shows 90%+ coverage",
+            "estimated_hours": 12,
+            "deliverables": ["CustomerCrudController.java", "CustomerCrudService.java"]
+        },
+        
+        # POST-MIGRATION VALIDATORS - Only for expanding coverage
+        {
+            "id": "validator_003",
+            "title": "Create End-to-End Test Suite",
+            "content": "Build E2E tests for complete customer workflows",
+            "depends_on": ["migrate_001", "migrate_002"],  # After migration, for E2E validation
+            "prompt": "Create end-to-end tests covering complete customer workflows. Test full user journeys.",
+            "definition_of_done": "E2E test suite with 20+ workflow tests",
+            "validation_mechanism": "Tests execute successfully, workflows validated",
+            "estimated_hours": 8,
+            "deliverables": ["CustomerE2ETests.java", "workflow_scenarios.md"]
+        }
+    ]
+}
+```
+
+## Critical Principles
+
+1. **No migration without validation**: Every `migrate_*` task must depend on a `validator_*` task
+2. **Tests are prerequisites, not afterthoughts**: Validators come BEFORE migrations in the dependency graph
+3. **Measurable validation only**: "Code review" is NOT validation. Tests, metrics, and coverage are.
+4. **Dependencies enforce sequencing**: The graph structure ensures tests exist before code
+5. **Every task independently executable**: Include ALL context in prompts - don't assume prior knowledge
+6. **Follow existing guides**: Use developer guides, testing guides, and documentation found in markdown files in the target repo
+7. **Zero tolerance for data accuracy**: Financial/banking systems require EXACT data matching, not "close enough"
+
+## Common Anti-Patterns to AVOID
+
+❌ **Writing tests after migration** - Tests must exist first
+❌ **Vague validation** - "Looks good" or "Review code" is not validation  
+❌ **Missing baselines** - Can't measure improvement without baselines
+❌ **Skipping test creation** - Every migration needs tests
+❌ **False dependencies** - Don't create dependencies just to serialize work
+❌ **Ignoring existing docs** - Always check target repo for guides and patterns
+
+## Output Instructions
+
+Create the task graph as `migration_plan.py` at the root of `[TARGET_REPO]`:
+
+```python
+# migration_plan.py
+migration_plan = {
+    "tasks": [
+        # Array of task nodes following above structure
+    ]
+}
+```
+
+Analyze both repositories to determine:
+1. What has already been migrated
+2. What remains to be done
+3. What validation mechanisms exist
+4. What validation mechanisms need to be created
+
+Generate a complete plan ensuring EVERY migration task has proper validation built FIRST.
