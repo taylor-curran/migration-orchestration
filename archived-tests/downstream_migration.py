@@ -86,9 +86,10 @@ def orchestrate_migration(
     logger.info(f"📊 Found {len(tasks)} tasks in structured output")
 
     # Limit tasks if max_downstream_sessions is specified
-    if max_downstream_sessions and len(tasks) > max_downstream_sessions:
+    if max_downstream_sessions is not None:
+        if len(tasks) > max_downstream_sessions:
+            logger.info(f"🔢 Limiting to {max_downstream_sessions} downstream sessions")
         tasks = tasks[:max_downstream_sessions]
-        logger.info(f"🔢 Limiting to {max_downstream_sessions} downstream sessions")
 
     # Step 3: Run downstream sessions if enabled
     downstream_results = []

@@ -3,15 +3,16 @@ from prefect import flow
 from tasks.run_sessions import run_session_and_wait_for_analysis
 from typing import Optional, Dict, Any
 
+
 @flow(log_prints=True)
 def orchestrate_migration(
-    initial_prompt: str, 
+    initial_prompt: str,
     title: str,
-    structured_output_schema: Optional[Dict[str, Any]] = None
+    structured_output_schema: Optional[Dict[str, Any]] = None,
 ):
     """
     Orchestrate a migration analysis with optional structured output.
-    
+
     Args:
         initial_prompt: The task prompt for Devin
         title: Session title
@@ -32,13 +33,13 @@ if __name__ == "__main__":
             {
                 "title": "Example task title",
                 "prompt": "Example task prompt for another agent",
-                "definition_of_done": "Example completion criteria"
+                "definition_of_done": "Example completion criteria",
             }
         ],
         "status": "0% complete - starting analysis",
-        "context": "Initial migration context"
+        "context": "Initial migration context",
     }
-    
+
     # The prompt references the structured output fields that are already in the request body
     initial_prompt = """
 !ask Analyze migration from taylor-curran/og-cics-cobol-app to taylor-curran/target-springboot-cics
@@ -59,18 +60,19 @@ Requirements for the tasks:
 
 DO NOT FORGET TO UPDATE STRUCTURED OUTPUT BEFORE FINISHING YOUR WORK
     """
-    
+
     title = "Migration Analysis - Parallel Tasks with Structured Output 2"
 
     # Run the orchestration with the structured output schema
     result = orchestrate_migration(
-        initial_prompt=initial_prompt, 
+        initial_prompt=initial_prompt,
         title=title,
-        structured_output_schema=structured_output_schema
+        structured_output_schema=structured_output_schema,
     )
-    
+
     # Print the structured output if available
     if result and result.get("structured_output"):
         import json
+
         print("\n📋 Structured Output Retrieved:")
         print(json.dumps(result["structured_output"], indent=2))

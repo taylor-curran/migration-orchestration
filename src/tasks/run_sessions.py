@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """
-Simple orchestrator for Devin API sessions with structured output tracking.
+Devin API session management with structured output tracking.
 
-Workflow:
-1. Create session with prompt (and optional structured output schema)
-2. Wait for 'blocked' state (tracking when structured output appears)
-3. Send sleep message to end session
-4. Collect analysis and final structured output
+Two-Phase Workflow:
+Phase 1 - Session Working (run_session_until_blocked):
+  1. Create session with prompt (and optional structured output schema)
+  2. Monitor session status until 'blocked' state
+  3. Track when structured output first appears
+
+Phase 2 - Analysis Generation (generate_analysis):
+  1. Send sleep message to trigger analysis
+  2. Wait for session to reach sleeping state
+  3. Collect analysis and final structured output
+  4. Create artifacts (timeline, improvements, quick stats, structured output)
 """
 
 import os
@@ -25,19 +31,14 @@ from utils.artifacts import (
     create_session_link_artifact,
     create_timeline_artifact,
     create_improvements_artifact,
-    create_orchestration_summary_artifact,
+    create_session_quick_stats_artifact,
     create_structured_output_artifact,
 )
 
 load_dotenv()
 
-# Default timeouts (in seconds)
-DEFAULT_TIMEOUTS = {
-    "blocked_wait": 2700,  # 45 minutes for session to reach blocked
-    "sleeping_wait": 300,  # 5 minutes to switch to sleeping
-    "analysis_wait": 420,  # 7 minutes for analysis to be ready
-    "poll_interval": 10,  # Check every 10 seconds (reduced for better structured output detection)
-}
+# Default poll interval (in seconds)
+DEFAULT_POLL_INTERVAL = 10  # Check every 10 seconds
 
 
 def create_session(
@@ -75,8 +76,7 @@ def create_session(
             f"Added schema fields to request: {list(structured_output_schema.keys())}"
         )
 
-    # Use longer timeout for API calls (30 seconds)
-    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
+    with httpx.Client() as client:
         response = client.post(url, headers=headers, json=data)
         response.raise_for_status()
 
@@ -97,8 +97,7 @@ def get_session_status(api_key: str, session_id: str) -> Dict[str, Any]:
     url = f"https://api.devin.ai/v1/sessions/{session_id}"
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    # Use longer timeout for API calls (30 seconds)
-    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
+    with httpx.Client() as client:
         response = client.get(url, headers=headers)
         response.raise_for_status()
 
@@ -113,8 +112,7 @@ def send_sleep_message(api_key: str, session_id: str) -> None:
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     data = {"message": "sleep"}
 
-    # Use longer timeout for API calls (30 seconds)
-    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
+    with httpx.Client() as client:
         response = client.post(url, headers=headers, json=data)
         response.raise_for_status()
 
@@ -125,8 +123,7 @@ def wait_for_status(
     api_key: str,
     session_id: str,
     target_statuses: list,
-    timeout: int,
-    poll_interval: int,
+    poll_interval: int = DEFAULT_POLL_INTERVAL,
     check_structured_output: bool = False,
 ) -> str:
     """Wait for session to reach one of the target statuses.
@@ -137,13 +134,48 @@ def wait_for_status(
     start_time = time.time()
     logger = get_run_logger()
     first_structured_output_time = None
+    previous_status = None
 
-    while time.time() - start_time < timeout:
+    # Status transition messages for better observability
+    status_messages = {
+        "planning": "📝 Planning phase",
+        "working": "⚙️ Working on implementation",
+        "blocked": "🛑 Blocked - waiting for input",
+        "finished": "💤 Sleeping",
+        "expired": "⏱️ Session expired",
+    }
+
+    while True:
         details = get_session_status(api_key, session_id)
         status = details.get("status_enum")
 
         elapsed = int(time.time() - start_time)
-        logger.debug(f"   Status: {status} (elapsed: {elapsed}s)")
+
+        # Log status transitions with meaningful messages
+        if status != previous_status:
+            # First status or transition
+            if previous_status is None:
+                logger.info(
+                    f"   Initial status: {status_messages.get(status, status)} (at {elapsed}s)"
+                )
+            else:
+                # Log important transitions
+                if previous_status == "planning" and status == "working":
+                    logger.info(
+                        f"✅ Planning complete! Devin is now working on implementation (at {elapsed}s)"
+                    )
+                elif previous_status == "working" and status == "blocked":
+                    logger.info(
+                        f"🏁 Work phase complete! Session is now blocked (at {elapsed}s)"
+                    )
+                else:
+                    logger.info(
+                        f"   Status changed: {status_messages.get(previous_status, previous_status)} → {status_messages.get(status, status)} (at {elapsed}s)"
+                    )
+            previous_status = status
+        else:
+            # Still same status, use debug
+            logger.debug(f"   Status: {status} (elapsed: {elapsed}s)")
 
         # Check for structured output if requested
         if check_structured_output and not first_structured_output_time:
@@ -163,8 +195,6 @@ def wait_for_status(
 
         time.sleep(poll_interval)
 
-    raise TimeoutError(f"Session did not reach {target_statuses} within {timeout}s")
-
 
 def get_session_analysis(api_key: str, session_id: str) -> Optional[Dict[str, Any]]:
     """Get session analysis from enterprise endpoint."""
@@ -172,8 +202,7 @@ def get_session_analysis(api_key: str, session_id: str) -> Optional[Dict[str, An
     url = f"https://api.devin.ai/beta/v2/enterprise/sessions/{session_id}"
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    # Use longer timeout for API calls (30 seconds)
-    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
+    with httpx.Client() as client:
         response = client.get(url, headers=headers)
         response.raise_for_status()
 
@@ -182,14 +211,14 @@ def get_session_analysis(api_key: str, session_id: str) -> Optional[Dict[str, An
 
 
 def wait_for_analysis(
-    api_key: str, session_id: str, timeout: int, poll_interval: int
+    api_key: str, session_id: str, poll_interval: int = DEFAULT_POLL_INTERVAL
 ) -> Dict[str, Any]:
     """Wait for session analysis to become available."""
 
     start_time = time.time()
     logger = get_run_logger()
 
-    while time.time() - start_time < timeout:
+    while True:
         analysis = get_session_analysis(api_key, session_id)
         elapsed = int(time.time() - start_time)
 
@@ -200,8 +229,6 @@ def wait_for_analysis(
         logger.debug(f"   Analysis not ready (elapsed: {elapsed}s)")
         time.sleep(poll_interval)
 
-    raise TimeoutError(f"Session analysis not available within {timeout}s")
-
 
 def get_structured_output(api_key: str, session_id: str) -> Optional[Dict[str, Any]]:
     """Get structured output from session if available."""
@@ -209,8 +236,7 @@ def get_structured_output(api_key: str, session_id: str) -> Optional[Dict[str, A
     url = f"https://api.devin.ai/v1/sessions/{session_id}"
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    # Use longer timeout for API calls (30 seconds)
-    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
+    with httpx.Client() as client:
         response = client.get(url, headers=headers)
         response.raise_for_status()
 
@@ -218,26 +244,28 @@ def get_structured_output(api_key: str, session_id: str) -> Optional[Dict[str, A
     return session_data.get("structured_output")
 
 
-@task
-def run_session_and_wait_for_analysis(
+@task(name="Devin Working")
+def run_session_until_blocked(
     prompt: str,
     title: Optional[str] = None,
     api_key: Optional[str] = None,
-    timeouts: Optional[Dict[str, int]] = None,
+    poll_interval: int = DEFAULT_POLL_INTERVAL,
     structured_output_schema: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Main orchestration function that runs a Devin session and collects results.
+    Task 1: Create and run a Devin session until it reaches blocked state.
+
+    This task handles the active work phase of the session.
 
     Args:
         prompt: The task prompt for Devin
         title: Optional session title
         api_key: Devin API key (uses env var if not provided)
-        timeouts: Optional timeout overrides
+        poll_interval: Polling interval in seconds (default: 10)
         structured_output_schema: Optional schema fields to add to request body
 
     Returns:
-        Dict containing session_id, session_url, analysis, suggested_prompt, and structured_output
+        Dict containing session_id, status, and timing information
     """
     logger = get_run_logger()
     start_time = time.time()
@@ -248,21 +276,15 @@ def run_session_and_wait_for_analysis(
         if not api_key:
             raise ValueError("DEVIN_API_KEY not found in environment")
 
-    config = DEFAULT_TIMEOUTS.copy()
-    if timeouts:
-        config.update(timeouts)
-
-    logger.info("🚀 Starting Devin Session Orchestration")
+    logger.info("🚀 Starting Session Work Phase")
     logger.info(f"📋 Prompt: {prompt[:100]}...")
 
     # Step 1: Create session
-    logger.info("[Step 1/4] Creating session...")
+    logger.info("[Step 1/2] Creating session...")
     session_id = create_session(api_key, prompt, title, structured_output_schema)
 
     # Step 2: Wait for blocked state (and check for structured output if schema provided)
-    logger.info(
-        f"[Step 2/4] Waiting for blocked or finished state (max {config['blocked_wait'] // 60}m)..."
-    )
+    logger.info("[Step 2/2] Waiting for blocked or finished state...")
 
     # Enable structured output checking if schema was provided
     if structured_output_schema:
@@ -272,11 +294,61 @@ def run_session_and_wait_for_analysis(
         api_key,
         session_id,
         ["blocked", "finished", "expired"],  # Note: finished = sleeping
-        config["blocked_wait"],
-        config["poll_interval"],
+        poll_interval=poll_interval,
         check_structured_output=(structured_output_schema is not None),
     )
 
+    logger.info(f"✅ Session reached {status} state")
+
+    # Return session info and status
+    session_url = f"https://app.devin.ai/sessions/{session_id.replace('devin-', '')}"
+    execution_time = time.time() - start_time
+
+    return {
+        "session_id": session_id,
+        "session_url": session_url,
+        "status": status,
+        "execution_time": execution_time,
+        "api_key": api_key,  # Pass through for next task
+        "poll_interval": poll_interval,  # Pass through for next task
+        "has_schema": structured_output_schema
+        is not None,  # Pass through for next task
+        "title": title,  # Pass through for artifacts
+    }
+
+
+@task(name="Devin Session Analysis")
+def generate_analysis(
+    session_info: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Task 2: Send sleep message and wait for analysis generation.
+
+    This task handles the analysis generation phase after the session has completed its work.
+
+    Args:
+        session_info: Output from run_session_until_blocked task containing session details
+
+    Returns:
+        Dict containing analysis and structured output
+    """
+    logger = get_run_logger()
+    start_time = time.time()
+
+    # Extract info from previous task
+    session_id = session_info["session_id"]
+    session_url = session_info["session_url"]
+    status = session_info["status"]
+    api_key = session_info["api_key"]
+    poll_interval = session_info["poll_interval"]
+    has_schema = session_info["has_schema"]
+    title = session_info.get("title")
+
+    logger.info("📊 Starting Analysis Generation Phase")
+    logger.info(f"   Session: {session_id}")
+    logger.info(f"   Current status: {status}")
+
+    # Handle different statuses
     if status != "blocked":
         logger.warning(f"⚠️  Session ended with status: {status}")
         if status == "finished":  # finished = sleeping
@@ -285,36 +357,29 @@ def run_session_and_wait_for_analysis(
         else:
             raise ValueError(f"Unexpected session status: {status}")
     else:
-        # Step 3: Send sleep message to end session
-        logger.info("[Step 3/4] Sending sleep message to end session...")
+        # Step 1: Send sleep message to end session
+        logger.info("[Step 1/3] Sending sleep message to trigger analysis...")
         send_sleep_message(api_key, session_id)
 
-        # Wait for sleeping state
-        logger.info(
-            f"   Waiting for sleeping state (max {config['sleeping_wait'] // 60}m)..."
-        )
+        # Step 2: Wait for sleeping state
+        logger.info("[Step 2/3] Waiting for sleeping state...")
         status = wait_for_status(
             api_key,
             session_id,
             ["finished", "expired"],
-            config["sleeping_wait"],
-            config["poll_interval"],
+            poll_interval=poll_interval,
         )
 
         if status != "finished":  # finished = sleeping
             raise ValueError(f"Session ended with status: {status}")
 
-    # Step 4: Wait for session analysis and get final structured output
-    logger.info(
-        f"[Step 4/4] Waiting for session analysis (max {config['analysis_wait'] // 60}m)..."
-    )
-    analysis = wait_for_analysis(
-        api_key, session_id, config["analysis_wait"], config["poll_interval"]
-    )
+    # Step 3: Wait for session analysis and get final structured output
+    logger.info("[Step 3/3] Waiting for session analysis...")
+    analysis = wait_for_analysis(api_key, session_id, poll_interval=poll_interval)
 
     # Get final structured output if schema was provided
     structured_output = None
-    if structured_output_schema:
+    if has_schema:
         logger.info("   Getting final structured output...")
         structured_output = get_structured_output(api_key, session_id)
         if structured_output:
@@ -322,10 +387,9 @@ def run_session_and_wait_for_analysis(
         else:
             logger.warning("   ⚠️  No structured output available at session end")
 
-    logger.info("✅ Orchestration complete!")
+    logger.info("✅ Analysis generation complete!")
 
     # Create artifacts with all the session analysis details
-    session_url = f"https://app.devin.ai/sessions/{session_id.replace('devin-', '')}"
     if analysis:
         logger.info("📄 Creating artifacts...")
 
@@ -335,9 +399,9 @@ def run_session_and_wait_for_analysis(
         # Create improvements artifact (prompt suggestions and action items)
         create_improvements_artifact(session_id, analysis)
 
-        # Create comprehensive summary artifact
+        # Create session quick stats artifact
         execution_time = time.time() - start_time
-        create_orchestration_summary_artifact(
+        create_session_quick_stats_artifact(
             session_id=session_id,
             session_url=session_url,
             analysis=analysis,
@@ -366,7 +430,56 @@ def run_session_and_wait_for_analysis(
         "suggested_prompt": improved_prompt,  # Now returns the actual improved prompt text
         "suggested_prompt_data": suggested_prompt_data,  # Full data including original and improved
         "structured_output": structured_output,  # Structured output from the session
+        "execution_time": execution_time,
     }
+
+
+@task(name="Run Session with Analysis")
+def run_session_and_wait_for_analysis(
+    prompt: str,
+    title: Optional[str] = None,
+    api_key: Optional[str] = None,
+    poll_interval: int = DEFAULT_POLL_INTERVAL,
+    structured_output_schema: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Main orchestration task that runs a Devin session by coordinating two sub-tasks.
+
+    This task orchestrates:
+    1. run_session_until_blocked - Creates and runs session until blocked
+    2. generate_analysis - Sends sleep message and collects analysis
+
+    Args:
+        prompt: The task prompt for Devin
+        title: Optional session title
+        api_key: Devin API key (uses env var if not provided)
+        poll_interval: Polling interval in seconds (default: 10)
+        structured_output_schema: Optional schema fields to add to request body
+
+    Returns:
+        Dict containing session_id, session_url, analysis, suggested_prompt, and structured_output
+    """
+    logger = get_run_logger()
+
+    logger.info("🎯 Orchestrating Devin Session with Two-Phase Execution")
+
+    # Phase 1: Run session until blocked
+    logger.info("── Phase 1: Session Working ──")
+    session_info = run_session_until_blocked(
+        prompt=prompt,
+        title=title,
+        api_key=api_key,
+        poll_interval=poll_interval,
+        structured_output_schema=structured_output_schema,
+    )
+
+    # Phase 2: Generate analysis
+    logger.info("── Phase 2: Analysis Generation ──")
+    result = generate_analysis(session_info)
+
+    logger.info("✅ Full orchestration complete!")
+
+    return result
 
 
 if __name__ == "__main__":
@@ -381,15 +494,8 @@ if __name__ == "__main__":
     - Includes example usage
     """
 
-    my_timeouts = {
-        "blocked_wait": 360,  # 6 minutes for session to reach blocked
-        "sleeping_wait": 300,  # 5 minutes to switch to sleeping
-        "analysis_wait": 240,  # 4 minutes for analysis to be ready
-        "poll_interval": 10,  # Check every 10 seconds
-    }
-
     result = run_session_and_wait_for_analysis(
-        prompt=example_prompt, title="Fibonacci Function", timeouts=my_timeouts
+        prompt=example_prompt, title="Fibonacci Function", poll_interval=10
     )
 
     print("\n📊 Session Analysis Summary:")

@@ -248,7 +248,7 @@ def create_improvements_artifact(session_id: str, analysis: Dict[str, Any]) -> s
     return artifact_id
 
 
-def create_orchestration_summary_artifact(
+def create_session_quick_stats_artifact(
     session_id: str,
     session_url: str,
     analysis: dict,
@@ -256,7 +256,7 @@ def create_orchestration_summary_artifact(
     title: Optional[str] = None,
 ) -> str:
     """
-    Create a comprehensive summary artifact for the entire orchestration.
+    Create a quick stats summary artifact for the Devin session.
 
     Args:
         session_id: The Devin session ID
@@ -268,7 +268,7 @@ def create_orchestration_summary_artifact(
     Returns:
         The artifact ID
     """
-    markdown_content = f"# Orchestration Summary\n\n"
+    markdown_content = f"# Session Quick Stats\n\n"
     markdown_content += f"**Session**: {title or 'Untitled'}\n"
     markdown_content += f"**Session ID**: `{session_id}`\n"
     markdown_content += f"**Execution Time**: {execution_time:.1f} seconds\n"
@@ -290,9 +290,9 @@ def create_orchestration_summary_artifact(
     markdown_content += f"## Status\n\n{status}\n"
 
     artifact_id = create_markdown_artifact(
-        key=f"orchestration-summary-{session_id}",
+        key=f"session-quick-stats-{session_id}",
         markdown=markdown_content,
-        description=f"Complete orchestration summary for session {session_id}",
+        description=f"Quick stats summary for session {session_id}",
     )
 
     return artifact_id
