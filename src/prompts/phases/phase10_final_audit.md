@@ -1,4 +1,4 @@
-# Phase 9: Final Audit and Polish
+# Phase 10: Final Audit and Polish
 
 ## Migration Context
 - **Source Repository**: `[SOURCE_REPO]`
@@ -10,7 +10,7 @@ Final audit. Fix any remaining issues. Add deliverables. Make it production-read
 **DO NOT**: Make major structural changes. This is final polish only.
 
 ## Previous Work Done
-- Phases 1-8: Complete task graph with all required fields
+- Phases 1-9: Complete task graph with all required fields
 - File exists: `migration_plan.py` fully populated
 
 ## What You Must Do

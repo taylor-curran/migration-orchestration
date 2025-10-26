@@ -1,4 +1,4 @@
-# Phase 8: Success Criteria (Definition of Done)
+# Phase 9: Success Criteria (Definition of Done)
 
 ## Migration Context
 - **Source Repository**: `[SOURCE_REPO]`
@@ -10,7 +10,7 @@ Add `definition_of_done` field to every task. Clear success criteria. One senten
 **DO NOT**: Write paragraphs. One sentence that defines completion.
 
 ## Previous Work Done
-- Phases 1-7: Complete graph with actions defined
+- Phases 1-8: Complete task graph with coverage tasks and actions defined
 - File exists: `migration_plan.py` with action fields
 
 ## What You Must Do
