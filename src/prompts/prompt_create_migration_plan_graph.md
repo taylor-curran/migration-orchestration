@@ -37,15 +37,20 @@ Never:
     "id": "unique_id",  # setup_*, validator_*, migrate_*
     "title": "Short descriptive title",
     "content": "What this working session accomplishes",
-    "status": "not-complete",  # Options: "not-complete", "complete" (binary only - if partially done, still "not-complete")
+    "status": "not-complete",  # Options: "not-complete", "completed" (binary only - if partially done, still "not-complete")
     "depends_on": ["task_ids"],  # Dependencies define execution order
-    "action": "Brief actionable description of what to do (1-2 sentences max)",
+    "action": "Brief actionable description of what to do",
     "definition_of_done": "Clear, measurable success criteria",
     "validation_mechanism": "How to concretely test, validate, sanity check, cross reference (tests, data quality metrics, observability metrics and data, coverage) - NOT just code review",
     "estimated_hours": 8,  # Target: 6-12 hours per task
     "deliverables": ["concrete_outputs.java"]  # Optional: specific files produced
 }
 ```
+
+## Task Brevity Rules
+- Titles: 20 words maximum
+- All fields should be concise and focused
+- Focus on WHAT, not HOW
 
 ## Task Categories and Sequencing
 
@@ -106,7 +111,7 @@ Split when:
             "id": "setup_001",
             "title": "Establish Performance Baseline",
             "content": "Measure legacy system performance for all programs",
-            "status": "not-complete",  # Options: "not-complete", "complete"
+            "status": "not-complete",  # Options: "not-complete", "completed"
             "depends_on": [],
             "action": "Measure P50/P95/P99 latencies for all programs in [SOURCE_REPO].",
             "definition_of_done": "Baseline metrics documented for all programs",
@@ -118,7 +123,7 @@ Split when:
             "id": "setup_002",
             "title": "Setup Target Monitoring",
             "content": "Deploy monitoring stack for target system",
-            "status": "not-complete",  # Options: "not-complete", "complete"
+            "status": "not-complete",  # Options: "not-complete", "completed"
             "depends_on": [],
             "action": "Deploy Prometheus/Grafana monitoring stack for [TARGET_REPO].",
             "definition_of_done": "Monitoring operational and collecting metrics",
@@ -130,7 +135,7 @@ Split when:
             "id": "validator_001",
             "title": "Create Customer Read Test Suite",
             "content": "Build tests for customer inquiry operations",
-            "status": "not-complete",  # Options: "not-complete", "complete"
+            "status": "not-complete",  # Options: "not-complete", "completed"
             "depends_on": ["setup_002"],  # Needs monitoring to verify test execution
             "action": "Achieve 90%+ test coverage for INQCUST and BROWCUST inquiry operations.",
             "definition_of_done": "Full coverage of read paths including edge cases, error handling",
@@ -142,7 +147,7 @@ Split when:
             "id": "validator_002", 
             "title": "Create Customer CRUD Test Suite",
             "content": "Build tests for customer create/update/delete",
-            "status": "not-complete",  # Options: "not-complete", "complete"
+            "status": "not-complete",  # Options: "not-complete", "completed"
             "depends_on": ["validator_001"],  # Extends read tests
             "action": "Test CRECUST, UPDCUST, DELCUST operations with transaction rollback scenarios.",
             "definition_of_done": "All CRUD paths tested including concurrent access, deadlock handling",
@@ -154,7 +159,7 @@ Split when:
             "id": "migrate_001",
             "title": "Migrate Customer Read Operations",
             "content": "Implement customer inquiry endpoints",
-            "status": "not-complete",  # Options: "not-complete", "complete"
+            "status": "not-complete",  # Options: "not-complete", "completed"
             "depends_on": ["setup_001", "setup_002", "validator_001"],  # DEPENDS on tests!
             "action": "Migrate customer read operations to [TARGET_REPO] using validator_001 tests.",
             "definition_of_done": "All read operations migrated, tests passing",
@@ -166,7 +171,7 @@ Split when:
             "id": "migrate_002",
             "title": "Migrate Customer CRUD Operations", 
             "content": "Implement customer create/update/delete",
-            "status": "not-complete",  # Options: "not-complete", "complete"
+            "status": "not-complete",  # Options: "not-complete", "completed"
             "depends_on": ["migrate_001", "validator_002"],  # DEPENDS on CRUD tests!
             "action": "Migrate customer CRUD operations preserving transaction boundaries.",
             "definition_of_done": "CRUD operations migrated, transaction handling correct",
@@ -178,7 +183,7 @@ Split when:
             "id": "validator_003",
             "title": "Create End-to-End Test Suite",
             "content": "Build E2E tests for complete customer workflows",
-            "status": "not-complete",  # Options: "not-complete", "complete"
+            "status": "not-complete",  # Options: "not-complete", "completed"
             "depends_on": ["migrate_001", "migrate_002"],  # After migration, for E2E validation
             "action": "Test customer lifecycle: create → inquire → update → browse → delete with data consistency checks.",
             "definition_of_done": "Full customer lifecycle validated, data integrity across operations verified",

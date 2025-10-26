@@ -4,6 +4,8 @@ Simple Parallel Runner v2 - Now with smart parallelization!
 Optionally uses ParallelDetector to find optimal parallel groups.
 """
 
+# TODO: I've barely looked at this file here..
+
 import sys
 from pathlib import Path
 from typing import Dict, List, Any

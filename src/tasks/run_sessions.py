@@ -33,6 +33,7 @@ from utils.artifacts import (
     create_improvements_artifact,
     create_session_quick_stats_artifact,
     create_structured_output_artifact,
+    create_pr_artifact,
 )
 
 load_dotenv()
@@ -196,8 +197,8 @@ def wait_for_status(
         time.sleep(poll_interval)
 
 
-def get_session_analysis(api_key: str, session_id: str) -> Optional[Dict[str, Any]]:
-    """Get session analysis from enterprise endpoint."""
+def get_enterprise_session_data(api_key: str, session_id: str) -> Dict[str, Any]:
+    """Get full enterprise session data including PRs and analysis."""
 
     url = f"https://api.devin.ai/beta/v2/enterprise/sessions/{session_id}"
     headers = {"Authorization": f"Bearer {api_key}"}
@@ -206,7 +207,12 @@ def get_session_analysis(api_key: str, session_id: str) -> Optional[Dict[str, An
         response = client.get(url, headers=headers)
         response.raise_for_status()
 
-    data = response.json()
+    return response.json()
+
+
+def get_session_analysis(api_key: str, session_id: str) -> Optional[Dict[str, Any]]:
+    """Get session analysis from enterprise endpoint."""
+    data = get_enterprise_session_data(api_key, session_id)
     return data.get("session_analysis")
 
 
@@ -373,9 +379,20 @@ def generate_analysis(
         if status != "finished":  # finished = sleeping
             raise ValueError(f"Session ended with status: {status}")
 
-    # Step 3: Wait for session analysis and get final structured output
+    # Step 3: Wait for session analysis and get full enterprise data
     logger.info("[Step 3/3] Waiting for session analysis...")
     analysis = wait_for_analysis(api_key, session_id, poll_interval=poll_interval)
+    
+    # Get full enterprise data to extract PRs
+    enterprise_data = get_enterprise_session_data(api_key, session_id)
+    prs = enterprise_data.get("prs", [])
+    
+    if prs:
+        logger.info(f"   🔧 Found {len(prs)} PR(s) created in session")
+        for pr in prs:
+            pr_url = pr.get("pr_url")
+            if pr_url:
+                logger.info(f"      📍 {pr_url} (state: {pr.get('state', 'unknown')})")
 
     # Get final structured output if schema was provided
     structured_output = None
@@ -413,6 +430,11 @@ def generate_analysis(
         if structured_output:
             create_structured_output_artifact(session_id, structured_output)
             logger.info("✅ Structured output artifact created")
+        
+        # Create PR artifact if PRs were created
+        if prs:
+            create_pr_artifact(session_id, prs)
+            logger.info(f"✅ PR artifact created for {len(prs)} PR(s)")
 
         logger.info("✅ Artifacts created successfully")
 
@@ -430,6 +452,7 @@ def generate_analysis(
         "suggested_prompt": improved_prompt,  # Now returns the actual improved prompt text
         "suggested_prompt_data": suggested_prompt_data,  # Full data including original and improved
         "structured_output": structured_output,  # Structured output from the session
+        "prs": prs,  # List of PRs created in the session
         "execution_time": execution_time,
     }
 
@@ -506,5 +529,11 @@ if __name__ == "__main__":
             print(f"   Action items: {len(result['analysis']['action_items'])}")
         if "timeline" in result["analysis"]:
             print(f"   Timeline events: {len(result['analysis']['timeline'])}")
+    
+    # Show PR info if available
+    if result.get("prs"):
+        print(f"\n🔧 Pull Requests Created: {len(result['prs'])}")
+        for pr in result["prs"]:
+            print(f"   📍 {pr.get('pr_url')} (state: {pr.get('state', 'unknown')})")
 
     print(f"\n🔗 Session URL: {result['session_url']}")

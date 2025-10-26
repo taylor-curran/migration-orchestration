@@ -384,3 +384,51 @@ def create_structured_output_artifact(
         )
 
     return artifact_id
+
+
+def create_pr_artifact(session_id: str, prs: List[Dict[str, Any]]) -> str:
+    """
+    Create an artifact displaying PRs created during the session.
+
+    Args:
+        session_id: The Devin session ID
+        prs: List of PR objects from the enterprise API
+
+    Returns:
+        The artifact ID
+    """
+    if not prs:
+        return None
+    
+    # Create markdown content with PR details
+    markdown_content = f"## 🔧 Pull Requests Created\n\n"
+    markdown_content += f"Session `{session_id}` created {len(prs)} PR(s):\n\n"
+    
+    for idx, pr in enumerate(prs, 1):
+        pr_url = pr.get("pr_url", "No URL")
+        state = pr.get("state", "unknown")
+        
+        # Extract PR number from URL if available
+        pr_number = "N/A"
+        if pr_url and "/pull/" in pr_url:
+            pr_number = pr_url.split("/pull/")[-1]
+        
+        # Add state emoji
+        state_emoji = {
+            "open": "🟢",
+            "closed": "🔴",
+            "merged": "🟣",
+            "draft": "⚪"
+        }.get(state.lower(), "⚫")
+        
+        markdown_content += f"### {idx}. PR #{pr_number} {state_emoji}\n"
+        markdown_content += f"- **URL:** [{pr_url}]({pr_url})\n"
+        markdown_content += f"- **State:** {state}\n\n"
+    
+    artifact_id = create_markdown_artifact(
+        key=f"session-prs-{session_id}",
+        markdown=markdown_content,
+        description=f"Pull requests created in session {session_id}",
+    )
+    
+    return artifact_id
