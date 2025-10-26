@@ -1,206 +1,332 @@
 #!/usr/bin/env python3
 """
-Simple visualization tool for migration_plan_graph.py
-Generates a Mermaid diagram where each task is exactly one node.
+Migration Plan Visualization Tool v2
+Generates interactive Mermaid diagram with automatic parallel detection.
+Works with simplified task structure from new prompt.
 
-Usage: 
-  python tools/visualize.py                  # Use default migration_plan_graph
-  python tools/visualize.py --adaptive       # Use sample adaptive plan
+Usage:
+  python tools/visualize_v2.py                      # Use default migration_plan_graph
+  python tools/visualize_v2.py path/to/plan.py      # Use specific plan file
 Output: docs/migration_diagram.html (opens automatically in browser)
 """
 
 import os
 import sys
+import json
 import webbrowser
+import argparse
 from pathlib import Path
+from typing import Dict, List, Any
 
-# Add project root to path to import migration_plan_graph
+# Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# Check for adaptive flag
-if len(sys.argv) > 1 and sys.argv[1] == '--adaptive':
-    from tools.sample_adaptive_plan import migration_plan_graph
-    print("📚 Using sample adaptive plan to demonstrate audit/replanning...")
-else:
-    from tools.migration_plan_graph import migration_plan_graph
+from src.utils.parallel_detector import ParallelDetector, analyze_tasks
+
+
+def load_migration_plan(file_path: str = None) -> Dict[str, Any]:
+    """Load migration plan from specified file or default location."""
+    if file_path:
+        plan_path = Path(file_path)
+    else:
+        # Try default location
+        plan_path = PROJECT_ROOT / "tools" / "migration_plan_graph.py"
+
+    if not plan_path.exists():
+        # Try to find migration_plan.py in common locations
+        alternatives = [
+            PROJECT_ROOT / "migration_plan.py",
+            PROJECT_ROOT.parent / "target-springboot-cics" / "migration_plan.py",
+        ]
+        for alt in alternatives:
+            if alt.exists():
+                plan_path = alt
+                break
+        else:
+            print(f"❌ Could not find migration plan at {plan_path}")
+            print("   Tried alternatives:", [str(a) for a in alternatives])
+            return None
+
+    print(f"📖 Loading migration plan from: {plan_path}")
+
+    # Import the module
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("migration_plan", plan_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    # Get the migration_plan variable
+    if hasattr(module, "migration_plan"):
+        return module.migration_plan
+    elif hasattr(module, "migration_plan_graph"):
+        return module.migration_plan_graph
+    else:
+        # Fallback to alternative locations if default file lacks required variables
+        alternatives = [
+            PROJECT_ROOT / "migration_plan.py",
+            PROJECT_ROOT.parent / "target-springboot-cics" / "migration_plan.py",
+        ]
+        for alt in alternatives:
+            if alt.exists():
+                print(f"🔍 Default plan missing variables, trying alternative: {alt}")
+                spec_alt = importlib.util.spec_from_file_location(
+                    "migration_plan_alt", alt
+                )
+                module_alt = importlib.util.module_from_spec(spec_alt)
+                spec_alt.loader.exec_module(module_alt)
+                if hasattr(module_alt, "migration_plan"):
+                    return module_alt.migration_plan
+                if hasattr(module_alt, "migration_plan_graph"):
+                    return module_alt.migration_plan_graph
+        print("❌ Could not find a valid migration plan in default or alternatives")
+        return None
+
+
+def infer_task_category(task: Dict[str, Any]) -> str:
+    """Infer task category from ID or content."""
+    task_id = task.get("id", "").lower()
+
+    if "setup" in task_id or "pre_" in task_id:
+        return "setup"
+    elif "validator" in task_id or "valid" in task_id:
+        return "validator"
+    elif "migrate" in task_id or "mig_" in task_id:
+        return "migration"
+    else:
+        return "other"
 
 
 def escape_text(text: str) -> str:
     """Escape text for Mermaid/HTML display."""
-    return text.replace('"', "'").replace('\n', ' ').replace('(', '').replace(')', '')
+    return text.replace('"', "'").replace("\n", " ").replace("(", "").replace(")", "")
 
 
-def generate_mermaid_code() -> str:
-    """Generate Mermaid diagram code from migration plan graph.
-    Focus on clear dependencies and parallel groups."""
+def generate_mermaid_code(tasks: List[Dict[str, Any]], analysis: Dict[str, Any]) -> str:
+    """Generate Mermaid diagram with parallel group visualization."""
     lines = []
     lines.append("graph TD")
     lines.append("")
-    
-    # Style definitions - simplified without audit/replan
+
+    # Style definitions
     lines.append("    %% Style definitions")
-    lines.append("    classDef pre fill:#e1f5fe,stroke:#01579b,stroke-width:2px")
-    lines.append("    classDef low fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px")
-    lines.append("    classDef medium fill:#fff9c4,stroke:#f57f17,stroke-width:2px")
-    lines.append("    classDef high fill:#ffccbc,stroke:#d84315,stroke-width:2px")
-    lines.append("    classDef validation fill:#e8eaf6,stroke:#283593,stroke-width:2px")
-    lines.append("    classDef critical stroke:#ff0000,stroke-width:3px")
-    lines.append("    classDef parallelGroup stroke:#9c27b0,stroke-width:3px,stroke-dasharray: 5 5")
+    lines.append("    classDef setup fill:#e1f5fe,stroke:#01579b,stroke-width:2px")
+    lines.append("    classDef validator fill:#f0e7ff,stroke:#6a1b9a,stroke-width:2px")
+    lines.append("    classDef migration fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px")
+    lines.append("    classDef other fill:#fff9c4,stroke:#f57f17,stroke-width:2px")
+    lines.append("    classDef critical stroke:#ff0000,stroke-width:4px")
+    lines.append(
+        "    classDef parallel fill:#fce4ec,stroke:#c2185b,stroke-width:3px,stroke-dasharray: 5 5"
+    )
     lines.append("")
-    
-    all_tasks = {}
-    critical_path = set(migration_plan_graph.get('critical_path', []))
-    
-    # Process pre-migration tasks
-    lines.append("    %% Pre-migration tasks")
-    for task in migration_plan_graph['migration_plan']['pre_migration_tasks']:
-        task_id = task['id']
-        all_tasks[task_id] = task
-        
-        content = escape_text(task['content'][:40])
-        hours = task.get('estimated_hours', 0)
-        label = f"{task_id}\\n{content}...\\n{hours}h"
-        
-        lines.append(f'    {task_id}["{label}"]:::pre')
+
+    # Track which tasks are in parallel groups
+    tasks_in_parallel = set()
+    for group in analysis.get("parallel_groups_detail", []):
+        tasks_in_parallel.update(group["tasks"])
+
+    # Track critical path
+    critical_path = set(analysis.get("critical_path", []))
+
+    # Add task nodes
+    lines.append("    %% Task nodes")
+    for task in tasks:
+        task_id = task["id"]
+        title = escape_text(task.get("title", task.get("content", "Task"))[:40])
+        hours = task.get("estimated_hours", 8)
+        category = infer_task_category(task)
+
+        # Build label
+        label_parts = [task_id, title + "...", f"{hours}h"]
+
+        # Add validation mechanism indicator if it's a validator task
+        if category == "validator" and task.get("validation_mechanism"):
+            label_parts.append(
+                "✓ " + escape_text(task["validation_mechanism"][:30]) + "..."
+            )
+
+        label = "\\n".join(label_parts)
+
+        # Determine node shape based on category
+        if category == "validator":
+            node = f'{task_id}["{label}"]:::validator'
+        elif category == "setup":
+            node = f'{task_id}["{label}"]:::setup'
+        elif category == "migration":
+            node = f'{task_id}["{label}"]:::migration'
+        else:
+            node = f'{task_id}["{label}"]:::other'
+
+        lines.append(f"    {node}")
+
+        # Add critical path styling
         if task_id in critical_path:
-            lines.append(f'    class {task_id} critical')
-    
-    lines.append("")
-    lines.append("    %% Migration tasks")
-    
-    # Process migration tasks
-    for task in migration_plan_graph['migration_plan']['migration_tasks']:
-        task_id = task['id']
-        all_tasks[task_id] = task
-        
-        content = escape_text(task['content'][:40])
-        complexity = task.get('complexity', 'medium')
-        hours = task.get('estimated_hours', 0)
-        audit = "🔒 " if task.get('audit_required', False) else ""
-        label = f"{task_id}\\n{audit}{content}...\\n{hours}h"
-        
-        lines.append(f'    {task_id}["{label}"]:::{complexity}')
-        if task_id in critical_path:
-            lines.append(f'    class {task_id} critical')
-    
-    lines.append("")
-    lines.append("    %% Validation tasks")
-    
-    # Process validation tasks
-    for task in migration_plan_graph['migration_plan'].get('validation_tasks', []):
-        task_id = task['id']
-        all_tasks[task_id] = task
-        
-        content = escape_text(task['content'][:40])
-        continuous = " ♾️" if task.get('type') == 'continuous' else ""
-        label = f"{task_id}\\n{content}...{continuous}"
-        
-        lines.append(f'    {task_id}(("{label}")):::validation')
-        if task_id in critical_path:
-            lines.append(f'    class {task_id} critical')
-    
+            lines.append(f"    class {task_id} critical")
+
+        # Add parallel group styling
+        if task_id in tasks_in_parallel:
+            lines.append(f"    class {task_id} parallel")
+
     lines.append("")
     lines.append("    %% Dependencies")
-    
-    # Add dependencies
-    for task_id, task in all_tasks.items():
-        if 'depends_on' in task:
-            for dep_id in task['depends_on']:
-                if dep_id in all_tasks:
-                    lines.append(f'    {dep_id} --> {task_id}')
-        
-        if 'blocks' in task:
-            for blocked_id in task['blocks']:
-                if blocked_id in all_tasks:
-                    lines.append(f'    {task_id} --> {blocked_id}')
-    
+
+    # Add dependency arrows
+    for task in tasks:
+        task_id = task["id"]
+        for dep_id in task.get("depends_on", []):
+            lines.append(f"    {dep_id} --> {task_id}")
+
+    lines.append("")
+    lines.append("    %% Parallel group annotations")
+
+    # Add subgraphs for parallel groups
+    for i, group in enumerate(analysis.get("parallel_groups_detail", [])):
+        if len(group["tasks"]) > 1:
+            lines.append(
+                f"    subgraph parallel_group_{i}[Parallel Group - Level {group['level']}]"
+            )
+            lines.append(f"        direction LR")
+            for task_id in group["tasks"]:
+                lines.append(f"        {task_id}")
+            lines.append("    end")
+            lines.append(
+                f"    style parallel_group_{i} fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5"
+            )
+
     return "\n".join(lines)
 
 
-def generate_html(mermaid_code: str) -> str:
-    """Generate HTML page with Mermaid diagram."""
-    
-    # Calculate stats - focus on core migration tasks only
-    pre_tasks = len(migration_plan_graph['migration_plan'].get('pre_migration_tasks', []))
-    mig_tasks = len(migration_plan_graph['migration_plan'].get('migration_tasks', []))
-    val_tasks = len(migration_plan_graph['migration_plan'].get('validation_tasks', []))
-    total_tasks = pre_tasks + mig_tasks + val_tasks
-    
-    # Count parallel groups if present
-    parallel_groups = len(migration_plan_graph.get('parallel_groups', []))
-    
-    # Count dependencies
-    dep_count = 0
-    for tasks in migration_plan_graph['migration_plan'].values():
-        if isinstance(tasks, list):
-            for task in tasks:
-                if 'depends_on' in task:
-                    dep_count += len(task['depends_on'])
-                if 'blocks' in task:
-                    dep_count += len(task['blocks'])
-    
-    # Count critical path
-    critical_path_count = len(migration_plan_graph.get('critical_path', []))
-    
+def generate_html(tasks: List[Dict[str, Any]], analysis: Dict[str, Any]) -> str:
+    """Generate HTML page with visualization and statistics."""
+
+    mermaid_code = generate_mermaid_code(tasks, analysis)
+
+    # Task counts by category
+    categories = {"setup": 0, "validator": 0, "migration": 0, "other": 0}
+    for task in tasks:
+        category = infer_task_category(task)
+        categories[category] += 1
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Migration Plan Visualization</title>
+    <title>Migration Plan Visualization v2</title>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <style>
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             margin: 0;
             padding: 20px;
-            background: #f5f5f5;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }}
+        .container {{
+            max-width: 1400px;
+            margin: 0 auto;
         }}
         .header {{
             text-align: center;
             margin-bottom: 30px;
+            color: white;
         }}
         h1 {{
-            color: #333;
             margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }}
+        .subtitle {{
+            opacity: 0.95;
+            font-size: 1.1em;
         }}
         .stats {{
-            display: flex;
-            justify-content: center;
-            gap: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
             margin-bottom: 30px;
-            flex-wrap: wrap;
         }}
         .stat {{
             background: white;
-            padding: 15px 25px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.2s;
+        }}
+        .stat:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
         }}
         .stat-value {{
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
             color: #333;
+            display: block;
         }}
         .stat-label {{
             color: #666;
-            font-size: 14px;
+            font-size: 13px;
             margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }}
+        .stat.highlight {{
+            background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
+            color: white;
+        }}
+        .stat.highlight .stat-value {{
+            color: white;
+        }}
+        .stat.highlight .stat-label {{
+            color: rgba(255,255,255,0.9);
         }}
         .diagram-container {{
             background: white;
             padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             overflow: auto;
+            margin-bottom: 30px;
+        }}
+        .efficiency {{
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }}
+        .efficiency h2 {{
+            margin-top: 0;
+            color: #333;
+        }}
+        .progress-bar {{
+            background: #e0e0e0;
+            border-radius: 10px;
+            height: 30px;
+            overflow: hidden;
+            margin: 15px 0;
+        }}
+        .progress-fill {{
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            transition: width 1s ease;
         }}
         .legend {{
             display: flex;
             justify-content: center;
-            gap: 30px;
-            margin-top: 30px;
+            gap: 25px;
+            margin-top: 20px;
             flex-wrap: wrap;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
         }}
         .legend-item {{
             display: flex;
@@ -208,81 +334,117 @@ def generate_html(mermaid_code: str) -> str:
             gap: 8px;
         }}
         .color-box {{
-            width: 20px;
-            height: 20px;
+            width: 24px;
+            height: 24px;
             border-radius: 4px;
+        }}
+        .critical-path {{
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+        }}
+        .critical-path h3 {{
+            margin-top: 0;
+            color: #d32f2f;
+        }}
+        .path-step {{
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 3px;
+            background: #ffebee;
+            border: 1px solid #d32f2f;
+            border-radius: 4px;
+            color: #d32f2f;
+            font-weight: 500;
         }}
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>📊 Migration Plan Visualization</h1>
-        <p style="color: #666;">Migration Plan - {total_tasks} Total Tasks</p>
-        <p style="color: #999; font-size: 14px;">
-            <strong>Focus:</strong> Clear dependencies and {parallel_groups} parallel execution groups
-        </p>
-    </div>
-    
-    <div class="stats">
-        <div class="stat">
-            <div class="stat-value">{pre_tasks}</div>
-            <div class="stat-label">Pre-migration</div>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Migration Plan Visualization</h1>
+            <p class="subtitle">Automatic Parallel Execution Detection</p>
         </div>
-        <div class="stat">
-            <div class="stat-value">{mig_tasks}</div>
-            <div class="stat-label">Migration</div>
+        
+        <div class="stats">
+            <div class="stat">
+                <span class="stat-value">{analysis["total_tasks"]}</span>
+                <div class="stat-label">Total Tasks</div>
+            </div>
+            <div class="stat">
+                <span class="stat-value">{categories["setup"]}</span>
+                <div class="stat-label">Setup Tasks</div>
+            </div>
+            <div class="stat">
+                <span class="stat-value">{categories["validator"]}</span>
+                <div class="stat-label">Validators</div>
+            </div>
+            <div class="stat">
+                <span class="stat-value">{categories["migration"]}</span>
+                <div class="stat-label">Migrations</div>
+            </div>
+            <div class="stat highlight">
+                <span class="stat-value">{analysis["parallel_groups"]}</span>
+                <div class="stat-label">Parallel Groups</div>
+            </div>
+            <div class="stat highlight">
+                <span class="stat-value">{analysis["max_parallelism"]}</span>
+                <div class="stat-label">Max Parallelism</div>
+            </div>
+            <div class="stat">
+                <span class="stat-value">{analysis["critical_path_length"]}</span>
+                <div class="stat-label">Critical Path</div>
+            </div>
         </div>
-        <div class="stat">
-            <div class="stat-value">{val_tasks}</div>
-            <div class="stat-label">Validation</div>
+        
+        <div class="efficiency">
+            <h2>⚡ Efficiency Analysis</h2>
+            <p><strong>Serial Execution:</strong> {analysis["total_duration_serial"]} hours</p>
+            <p><strong>Parallel Execution:</strong> {analysis["total_duration_parallel"]} hours</p>
+            <p><strong>Time Saved:</strong> {analysis["time_saved"]} hours ({analysis["efficiency_gain"]}% faster)</p>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {min(analysis["efficiency_gain"], 100)}%">
+                    {analysis["efficiency_gain"]}% Efficiency Gain
+                </div>
+            </div>
         </div>
-        <div class="stat" style="border: 2px solid #9c27b0;">
-            <div class="stat-value">{parallel_groups}</div>
-            <div class="stat-label">Parallel Groups</div>
+        
+        <div class="critical-path">
+            <h3>🔴 Critical Path ({analysis["critical_path_duration"]} hours)</h3>
+            <div>
+                {" → ".join(f'<span class="path-step">{task_id}</span>' for task_id in analysis["critical_path"])}
+            </div>
         </div>
-        <div class="stat">
-            <div class="stat-value">{dep_count}</div>
-            <div class="stat-label">Dependencies</div>
-        </div>
-        <div class="stat">
-            <div class="stat-value">{critical_path_count}</div>
-            <div class="stat-label">Critical Path</div>
-        </div>
-    </div>
-    
-    <div class="diagram-container">
-        <div class="mermaid">
+        
+        <div class="diagram-container">
+            <div class="mermaid">
 {mermaid_code}
+            </div>
         </div>
-    </div>
-    
-    <div class="legend">
-        <div class="legend-item">
-            <div class="color-box" style="background: #e1f5fe; border: 2px solid #01579b;"></div>
-            <span>Pre-migration</span>
-        </div>
-        <div class="legend-item">
-            <div class="color-box" style="background: #c8e6c9; border: 2px solid #2e7d32;"></div>
-            <span>Low Complexity</span>
-        </div>
-        <div class="legend-item">
-            <div class="color-box" style="background: #fff9c4; border: 2px solid #f57f17;"></div>
-            <span>Medium Complexity</span>
-        </div>
-        <div class="legend-item">
-            <div class="color-box" style="background: #ffccbc; border: 2px solid #d84315;"></div>
-            <span>High Complexity</span>
-        </div>
-        <div class="legend-item">
-            <div class="color-box" style="background: #e8eaf6; border: 2px solid #283593;"></div>
-            <span>Validation</span>
-        </div>
-        <div class="legend-item">
-            <div class="color-box" style="background: white; border: 3px solid #ff0000;"></div>
-            <span>Critical Path</span>
-        </div>
-        <div class="legend-item">
-            <span>♾️ Continuous Validation</span>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="color-box" style="background: #e1f5fe; border: 2px solid #01579b;"></div>
+                <span>Setup Tasks</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background: #f0e7ff; border: 2px solid #6a1b9a;"></div>
+                <span>Validators</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background: #c8e6c9; border: 2px solid #2e7d32;"></div>
+                <span>Migration Tasks</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background: #fce4ec; border: 3px dashed #c2185b;"></div>
+                <span>Can Run in Parallel</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background: white; border: 4px solid #ff0000;"></div>
+                <span>Critical Path</span>
+            </div>
         </div>
     </div>
     
@@ -293,63 +455,91 @@ def generate_html(mermaid_code: str) -> str:
             flowchart: {{
                 useMaxWidth: true,
                 htmlLabels: true,
-                curve: 'basis'
+                curve: 'basis',
+                padding: 20
             }}
         }});
     </script>
 </body>
 </html>"""
-    
+
     return html
 
 
 def main():
-    """Generate visualization and open in browser."""
-    print("🚀 Generating migration plan visualization...")
-    
-    # Generate Mermaid code
-    mermaid_code = generate_mermaid_code()
-    
+    """Main entry point."""
+    parser = argparse.ArgumentParser(
+        description="Visualize migration plan with parallel detection"
+    )
+    parser.add_argument("file", nargs="?", help="Path to migration plan file")
+    parser.add_argument(
+        "--no-browser", action="store_true", help="Don't open in browser"
+    )
+    args = parser.parse_args()
+
+    # Load migration plan
+    migration_plan = load_migration_plan(args.file)
+    if not migration_plan:
+        return 1
+
+    # Extract tasks - handle both old and new structure
+    if "tasks" in migration_plan:
+        # New simplified structure
+        tasks = migration_plan["tasks"]
+    elif "migration_plan" in migration_plan:
+        # Old nested structure - flatten it
+        tasks = []
+        for category in ["pre_migration_tasks", "migration_tasks", "validation_tasks"]:
+            if category in migration_plan["migration_plan"]:
+                tasks.extend(migration_plan["migration_plan"][category])
+    else:
+        print("❌ Unknown migration plan structure")
+        return 1
+
+    print(f"📊 Analyzing {len(tasks)} tasks...")
+
+    # Analyze with parallel detector
+    analysis = analyze_tasks(tasks)
+
     # Generate HTML
-    html_content = generate_html(mermaid_code)
-    
-    # Ensure docs directory exists
+    html_content = generate_html(tasks, analysis)
+
+    # Save to file
     docs_dir = PROJECT_ROOT / "docs"
     docs_dir.mkdir(exist_ok=True)
-    
-    # Save HTML file
+
     output_file = docs_dir / "migration_diagram.html"
-    with open(output_file, 'w') as f:
+    with open(output_file, "w") as f:
         f.write(html_content)
-    
-    print(f"✅ Visualization saved to: docs/migration_diagram.html")
-    
-    # Open in browser
-    file_url = f"file://{output_file.absolute()}"
-    webbrowser.open(file_url)
-    print("📊 Opening in browser...")
-    
-    # Print stats - focus on core migration tasks
-    pre_count = len(migration_plan_graph['migration_plan'].get('pre_migration_tasks', []))
-    mig_count = len(migration_plan_graph['migration_plan'].get('migration_tasks', []))
-    val_count = len(migration_plan_graph['migration_plan'].get('validation_tasks', []))
-    parallel_count = len(migration_plan_graph.get('parallel_groups', []))
-    
-    print(f"\nStats:")
-    print(f"  • Pre-migration tasks: {pre_count}")
-    print(f"  • Migration tasks: {mig_count}")
-    print(f"  • Validation tasks: {val_count}")
-    print(f"  • Parallel groups: {parallel_count}")
-    print(f"  • Total: {pre_count + mig_count + val_count} tasks")
-    
-    # Note about audit/replanning being handled separately
-    if 'audit_tasks' in migration_plan_graph['migration_plan'] or 'replanning_tasks' in migration_plan_graph['migration_plan']:
-        audit_count = len(migration_plan_graph['migration_plan'].get('audit_tasks', []))
-        replan_count = len(migration_plan_graph['migration_plan'].get('replanning_tasks', []))
-        if audit_count > 0 or replan_count > 0:
-            print(f"\n  Note: {audit_count} audit and {replan_count} replanning tasks are in the data")
-            print(f"        but not visualized - they're inferred from parallel groups")
+
+    print(f"✅ Visualization saved to: {output_file}")
+
+    # Print analysis summary
+    print("\n📈 Parallelization Analysis:")
+    print(f"  • Total tasks: {analysis['total_tasks']}")
+    print(f"  • Parallel groups detected: {analysis['parallel_groups']}")
+    print(f"  • Maximum parallelism: {analysis['max_parallelism']} tasks")
+    print(f"  • Serial execution time: {analysis['total_duration_serial']} hours")
+    print(f"  • Parallel execution time: {analysis['total_duration_parallel']} hours")
+    print(
+        f"  • Time saved: {analysis['time_saved']} hours ({analysis['efficiency_gain']}%)"
+    )
+
+    if analysis["parallel_groups_detail"]:
+        print("\n🔀 Parallel Groups:")
+        for group in analysis["parallel_groups_detail"]:
+            print(
+                f"  Level {group['level']}: {', '.join(group['tasks'])} ({group['size']} tasks)"
+            )
+
+    # Open in browser unless disabled
+    if not args.no_browser:
+        file_url = f"file://{output_file.absolute()}"
+        webbrowser.open(file_url)
+        print("\n🌐 Opening in browser...")
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

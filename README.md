@@ -1,6 +1,10 @@
-# migration-orchestration
+# Migration Orchestration
 
-Orchestrate Devin API sessions with automated workflow management and session analysis retrieval.
+This project orchestrates the migration from a COBOL CICS banking application to a Spring Boot microservices architecture using AI-powered code generation and automated testing.
+
+## 🚀 Quick Start
+
+See [ORCHESTRATION_README.md](./ORCHESTRATION_README.md) for the simple orchestration flow.
 
 ## Virtual Environment Setup
 

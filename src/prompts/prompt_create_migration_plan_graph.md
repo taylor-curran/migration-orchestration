@@ -37,6 +37,7 @@ Never:
     "id": "unique_id",  # setup_*, validator_*, migrate_*
     "title": "Short descriptive title",
     "content": "What this working session accomplishes",
+    "status": "not-complete",  # Options: "not-complete", "complete" (binary only - if partially done, still "not-complete")
     "depends_on": ["task_ids"],  # Dependencies define execution order
     "action": "Brief actionable description of what to do (1-2 sentences max)",
     "definition_of_done": "Clear, measurable success criteria",
@@ -101,11 +102,11 @@ Split when:
 ```python
 {
     "tasks": [
-        # SETUP PHASE - Foundation
         {
             "id": "setup_001",
             "title": "Establish Performance Baseline",
             "content": "Measure legacy system performance for all programs",
+            "status": "not-complete",  # Options: "not-complete", "complete"
             "depends_on": [],
             "action": "Measure P50/P95/P99 latencies for all programs in [SOURCE_REPO].",
             "definition_of_done": "Baseline metrics documented for all programs",
@@ -117,6 +118,7 @@ Split when:
             "id": "setup_002",
             "title": "Setup Target Monitoring",
             "content": "Deploy monitoring stack for target system",
+            "status": "not-complete",  # Options: "not-complete", "complete"
             "depends_on": [],
             "action": "Deploy Prometheus/Grafana monitoring stack for [TARGET_REPO].",
             "definition_of_done": "Monitoring operational and collecting metrics",
@@ -124,12 +126,11 @@ Split when:
             "estimated_hours": 8,
             "deliverables": ["monitoring_config.yaml", "dashboard_urls.txt"]
         },
-        
-        # VALIDATOR PHASE - Build tests BEFORE migration
         {
             "id": "validator_001",
             "title": "Create Customer Read Test Suite",
             "content": "Build tests for customer inquiry operations",
+            "status": "not-complete",  # Options: "not-complete", "complete"
             "depends_on": ["setup_002"],  # Needs monitoring to verify test execution
             "action": "Achieve 90%+ test coverage for INQCUST and BROWCUST inquiry operations.",
             "definition_of_done": "Full coverage of read paths including edge cases, error handling",
@@ -141,6 +142,7 @@ Split when:
             "id": "validator_002", 
             "title": "Create Customer CRUD Test Suite",
             "content": "Build tests for customer create/update/delete",
+            "status": "not-complete",  # Options: "not-complete", "complete"
             "depends_on": ["validator_001"],  # Extends read tests
             "action": "Test CRECUST, UPDCUST, DELCUST operations with transaction rollback scenarios.",
             "definition_of_done": "All CRUD paths tested including concurrent access, deadlock handling",
@@ -148,12 +150,11 @@ Split when:
             "estimated_hours": 10,
             "deliverables": ["CustomerCrudTests.java", "transaction_fixtures.sql"]
         },
-        
-        # MIGRATION PHASE - Migrate USING the tests
         {
             "id": "migrate_001",
             "title": "Migrate Customer Read Operations",
             "content": "Implement customer inquiry endpoints",
+            "status": "not-complete",  # Options: "not-complete", "complete"
             "depends_on": ["setup_001", "setup_002", "validator_001"],  # DEPENDS on tests!
             "action": "Migrate customer read operations to [TARGET_REPO] using validator_001 tests.",
             "definition_of_done": "All read operations migrated, tests passing",
@@ -165,6 +166,7 @@ Split when:
             "id": "migrate_002",
             "title": "Migrate Customer CRUD Operations", 
             "content": "Implement customer create/update/delete",
+            "status": "not-complete",  # Options: "not-complete", "complete"
             "depends_on": ["migrate_001", "validator_002"],  # DEPENDS on CRUD tests!
             "action": "Migrate customer CRUD operations preserving transaction boundaries.",
             "definition_of_done": "CRUD operations migrated, transaction handling correct",
@@ -172,12 +174,11 @@ Split when:
             "estimated_hours": 12,
             "deliverables": ["CustomerCrudController.java", "CustomerCrudService.java"]
         },
-        
-        # POST-MIGRATION VALIDATORS - Only for expanding coverage
         {
             "id": "validator_003",
             "title": "Create End-to-End Test Suite",
             "content": "Build E2E tests for complete customer workflows",
+            "status": "not-complete",  # Options: "not-complete", "complete"
             "depends_on": ["migrate_001", "migrate_002"],  # After migration, for E2E validation
             "action": "Test customer lifecycle: create → inquire → update → browse → delete with data consistency checks.",
             "definition_of_done": "Full customer lifecycle validated, data integrity across operations verified",

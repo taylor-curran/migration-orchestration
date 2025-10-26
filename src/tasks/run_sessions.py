@@ -76,7 +76,7 @@ def create_session(
             f"Added schema fields to request: {list(structured_output_schema.keys())}"
         )
 
-    with httpx.Client() as client:
+    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
         response = client.post(url, headers=headers, json=data)
         response.raise_for_status()
 
@@ -97,7 +97,7 @@ def get_session_status(api_key: str, session_id: str) -> Dict[str, Any]:
     url = f"https://api.devin.ai/v1/sessions/{session_id}"
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    with httpx.Client() as client:
+    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
         response = client.get(url, headers=headers)
         response.raise_for_status()
 
@@ -112,7 +112,7 @@ def send_sleep_message(api_key: str, session_id: str) -> None:
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     data = {"message": "sleep"}
 
-    with httpx.Client() as client:
+    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
         response = client.post(url, headers=headers, json=data)
         response.raise_for_status()
 
@@ -202,7 +202,7 @@ def get_session_analysis(api_key: str, session_id: str) -> Optional[Dict[str, An
     url = f"https://api.devin.ai/beta/v2/enterprise/sessions/{session_id}"
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    with httpx.Client() as client:
+    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
         response = client.get(url, headers=headers)
         response.raise_for_status()
 
@@ -236,7 +236,7 @@ def get_structured_output(api_key: str, session_id: str) -> Optional[Dict[str, A
     url = f"https://api.devin.ai/v1/sessions/{session_id}"
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    with httpx.Client() as client:
+    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
         response = client.get(url, headers=headers)
         response.raise_for_status()
 

@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Migration Plan Visualization v2</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+        h1 {
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        .subtitle {
+            opacity: 0.95;
+            font-size: 1.1em;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .stat {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        .stat:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+            display: block;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 13px;
+            margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stat.highlight {
+            background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
+            color: white;
+        }
+        .stat.highlight .stat-value {
+            color: white;
+        }
+        .stat.highlight .stat-label {
+            color: rgba(255,255,255,0.9);
+        }
+        .diagram-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: auto;
+            margin-bottom: 30px;
+        }
+        .efficiency {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .efficiency h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .progress-bar {
+            background: #e0e0e0;
+            border-radius: 10px;
+            height: 30px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        .progress-fill {
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            transition: width 1s ease;
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .color-box {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+        }
+        .critical-path {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+        }
+        .critical-path h3 {
+            margin-top: 0;
+            color: #d32f2f;
+        }
+        .path-step {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 3px;
+            background: #ffebee;
+            border: 1px solid #d32f2f;
+            border-radius: 4px;
+            color: #d32f2f;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Migration Plan Visualization</h1>
+            <p class="subtitle">Automatic Parallel Execution Detection</p>
+        </div>
+        
+        <div class="stats">
+            <div class="stat">
+                <span class="stat-value">26</span>
+                <div class="stat-label">Total Tasks</div>
+            </div>
+            <div class="stat">
+                <span class="stat-value">7</span>
+                <div class="stat-label">Setup Tasks</div>
+            </div>
+            <div class="stat">
+                <span class="stat-value">7</span>
+                <div class="stat-label">Validators</div>
+            </div>
+            <div class="stat">
+                <span class="stat-value">12</span>
+                <div class="stat-label">Migrations</div>
+            </div>
+            <div class="stat highlight">
+                <span class="stat-value">8</span>
+                <div class="stat-label">Parallel Groups</div>
+            </div>
+            <div class="stat highlight">
+                <span class="stat-value">7</span>
+                <div class="stat-label">Max Parallelism</div>
+            </div>
+            <div class="stat">
+                <span class="stat-value">8</span>
+                <div class="stat-label">Critical Path</div>
+            </div>
+        </div>
+        
+        <div class="efficiency">
+            <h2>⚡ Efficiency Analysis</h2>
+            <p><strong>Serial Execution:</strong> 236 hours</p>
+            <p><strong>Parallel Execution:</strong> 82 hours</p>
+            <p><strong>Time Saved:</strong> 154 hours (65.3% faster)</p>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 65.3%">
+                    65.3% Efficiency Gain
+                </div>
+            </div>
+        </div>
+        
+        <div class="critical-path">
+            <h3>🔴 Critical Path (74 hours)</h3>
+            <div>
+                <span class="path-step">setup_003</span> → <span class="path-step">setup_005</span> → <span class="path-step">validator_001</span> → <span class="path-step">migrate_001</span> → <span class="path-step">migrate_005</span> → <span class="path-step">migrate_007</span> → <span class="path-step">migrate_010</span> → <span class="path-step">migrate_011</span>
+            </div>
+        </div>
+        
+        <div class="diagram-container">
+            <div class="mermaid">
+graph TD
+
+    %% Style definitions
+    classDef setup fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef validator fill:#f0e7ff,stroke:#6a1b9a,stroke-width:2px
+    classDef migration fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    classDef other fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef critical stroke:#ff0000,stroke-width:4px
+    classDef parallel fill:#fce4ec,stroke:#c2185b,stroke-width:3px,stroke-dasharray: 5 5
+
+    %% Task nodes
+    setup_000["setup_000\nVerify and Document Schema Consistency T...\n4h"]:::setup
+    class setup_000 parallel
+    setup_001["setup_001\nEstablish Performance Baseline for Legac...\n10h"]:::setup
+    class setup_001 parallel
+    setup_002["setup_002\nSetup Continuous Monitoring and Observab...\n8h"]:::setup
+    class setup_002 parallel
+    setup_003["setup_003\nEnhance CI/CD Pipeline with Coverage Enf...\n8h"]:::setup
+    class setup_003 critical
+    class setup_003 parallel
+    setup_004["setup_004\nExtract and Document COBOL Business Rule...\n10h"]:::setup
+    class setup_004 parallel
+    setup_005["setup_005\nCreate Test Infrastructure and Common He...\n8h"]:::setup
+    class setup_005 critical
+    class setup_005 parallel
+    setup_006["setup_006\nDocument Test Data Baseline and Create F...\n6h"]:::setup
+    class setup_006 parallel
+    validator_000["validator_000\nCreate Named Counter Service Test Suite...\n6h\n✓ All 20+ tests pass successfull..."]:::validator
+    class validator_000 parallel
+    validator_001["validator_001\nCreate Comprehensive Customer CRUD Test ...\n12h\n✓ Validation includes: 1 All 4..."]:::validator
+    class validator_001 critical
+    class validator_001 parallel
+    validator_002["validator_002\nCreate Comprehensive Account CRUD Test S...\n12h\n✓ Validation includes: 1 All 3..."]:::validator
+    class validator_002 parallel
+    validator_003["validator_003\nCreate Account Inquiry by Customer Test ...\n8h\n✓ Validation includes: 1 All 2..."]:::validator
+    class validator_003 parallel
+    validator_004["validator_004\nCreate Transaction Operations Test Suite...\n12h\n✓ Validation includes: 1 All 3..."]:::validator
+    class validator_004 parallel
+    validator_005["validator_005\nCreate Credit Agency Services Test Suite...\n10h\n✓ Validation includes: 1 All 2..."]:::validator
+    class validator_005 parallel
+    validator_006["validator_006\nCreate Retroactive CreditAgencyService T...\n10h\n✓ Validation includes: 1 All 3..."]:::validator
+    class validator_006 parallel
+    migrate_001["migrate_001\nMigrate INQCUST - Customer Inquiry Opera...\n8h"]:::migration
+    class migrate_001 critical
+    class migrate_001 parallel
+    migrate_002["migrate_002\nMigrate CRECUST - Create Customer Operat...\n12h"]:::migration
+    class migrate_002 parallel
+    migrate_003["migrate_003\nMigrate UPDCUST - Update Customer Operat...\n10h"]:::migration
+    class migrate_003 parallel
+    migrate_004["migrate_004\nMigrate DELCUS - Delete Customer Operati...\n8h"]:::migration
+    class migrate_004 parallel
+    migrate_005["migrate_005\nMigrate INQACC - Account Inquiry Operati...\n8h"]:::migration
+    class migrate_005 critical
+    class migrate_005 parallel
+    migrate_006["migrate_006\nMigrate INQACCCU - Inquire Accounts by C...\n8h"]:::migration
+    class migrate_006 parallel
+    migrate_007["migrate_007\nMigrate CREACC - Create Account Operatio...\n10h"]:::migration
+    class migrate_007 critical
+    class migrate_007 parallel
+    migrate_008["migrate_008\nMigrate UPDACC - Update Account Operatio...\n10h"]:::migration
+    class migrate_008 parallel
+    migrate_009["migrate_009\nMigrate DELACC - Delete Account Operatio...\n8h"]:::migration
+    class migrate_009 parallel
+    migrate_010["migrate_010\nMigrate DBCRFUN - Debit/Credit Fund Oper...\n10h"]:::migration
+    class migrate_010 critical
+    class migrate_010 parallel
+    migrate_011["migrate_011\nMigrate XFRFUN - Transfer Fund Operation...\n10h"]:::migration
+    class migrate_011 critical
+    class migrate_011 parallel
+    migrate_012["migrate_012\nMigrate Credit Agencies 2-5 CRDTAGY2, C...\n10h"]:::migration
+    class migrate_012 parallel
+
+    %% Dependencies
+    setup_003 --> setup_005
+    setup_002 --> setup_006
+    setup_003 --> validator_000
+    setup_004 --> validator_000
+    setup_005 --> validator_000
+    setup_002 --> validator_001
+    setup_004 --> validator_001
+    setup_005 --> validator_001
+    setup_002 --> validator_002
+    setup_004 --> validator_002
+    setup_005 --> validator_002
+    setup_002 --> validator_003
+    setup_004 --> validator_003
+    setup_005 --> validator_003
+    setup_002 --> validator_004
+    setup_004 --> validator_004
+    setup_005 --> validator_004
+    setup_002 --> validator_005
+    setup_004 --> validator_005
+    setup_005 --> validator_005
+    setup_002 --> validator_006
+    setup_004 --> validator_006
+    setup_005 --> validator_006
+    setup_001 --> migrate_001
+    setup_003 --> migrate_001
+    validator_001 --> migrate_001
+    migrate_001 --> migrate_002
+    validator_001 --> migrate_002
+    validator_005 --> migrate_002
+    validator_006 --> migrate_002
+    migrate_001 --> migrate_003
+    migrate_002 --> migrate_003
+    validator_001 --> migrate_003
+    migrate_001 --> migrate_004
+    migrate_002 --> migrate_004
+    migrate_003 --> migrate_004
+    validator_001 --> migrate_004
+    migrate_001 --> migrate_005
+    setup_001 --> migrate_005
+    setup_003 --> migrate_005
+    validator_002 --> migrate_005
+    migrate_001 --> migrate_006
+    migrate_005 --> migrate_006
+    validator_003 --> migrate_006
+    migrate_001 --> migrate_007
+    migrate_005 --> migrate_007
+    validator_002 --> migrate_007
+    migrate_005 --> migrate_008
+    migrate_007 --> migrate_008
+    validator_002 --> migrate_008
+    migrate_005 --> migrate_009
+    migrate_007 --> migrate_009
+    migrate_008 --> migrate_009
+    validator_002 --> migrate_009
+    migrate_005 --> migrate_010
+    migrate_007 --> migrate_010
+    validator_004 --> migrate_010
+    migrate_010 --> migrate_011
+    validator_004 --> migrate_011
+    validator_005 --> migrate_012
+    validator_006 --> migrate_012
+
+    %% Parallel group annotations
+    subgraph parallel_group_0[Parallel Group - Level 0]
+        direction LR
+        setup_000
+        setup_001
+        setup_002
+        setup_003
+        setup_004
+    end
+    style parallel_group_0 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
+    subgraph parallel_group_1[Parallel Group - Level 1]
+        direction LR
+        setup_005
+        setup_006
+    end
+    style parallel_group_1 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
+    subgraph parallel_group_2[Parallel Group - Level 2]
+        direction LR
+        validator_000
+        validator_001
+        validator_002
+        validator_003
+        validator_004
+        validator_005
+        validator_006
+    end
+    style parallel_group_2 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
+    subgraph parallel_group_3[Parallel Group - Level 3]
+        direction LR
+        migrate_001
+        migrate_012
+    end
+    style parallel_group_3 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
+    subgraph parallel_group_4[Parallel Group - Level 4]
+        direction LR
+        migrate_002
+        migrate_005
+    end
+    style parallel_group_4 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
+    subgraph parallel_group_5[Parallel Group - Level 5]
+        direction LR
+        migrate_003
+        migrate_006
+        migrate_007
+    end
+    style parallel_group_5 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
+    subgraph parallel_group_6[Parallel Group - Level 6]
+        direction LR
+        migrate_004
+        migrate_008
+        migrate_010
+    end
+    style parallel_group_6 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
+    subgraph parallel_group_7[Parallel Group - Level 7]
+        direction LR
+        migrate_009
+        migrate_011
+    end
+    style parallel_group_7 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
+            </div>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="color-box" style="background: #e1f5fe; border: 2px solid #01579b;"></div>
+                <span>Setup Tasks</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background: #f0e7ff; border: 2px solid #6a1b9a;"></div>
+                <span>Validators</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background: #c8e6c9; border: 2px solid #2e7d32;"></div>
+                <span>Migration Tasks</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background: #fce4ec; border: 3px dashed #c2185b;"></div>
+                <span>Can Run in Parallel</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background: white; border: 4px solid #ff0000;"></div>
+                <span>Critical Path</span>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis',
+                padding: 20
+            }
+        });
+    </script>
+</body>
+</html>
