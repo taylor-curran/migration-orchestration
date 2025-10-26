@@ -62,12 +62,13 @@ Infrastructure and baselines that everything depends on:
 - CI/CD pipeline configuration
 
 ### 2. Validator Tasks (Before Each Migration)
-Create validation mechanisms BEFORE the code they will validate:
-- Integration test suites
-- Performance benchmarks
-- Data comparison tools
-- Coverage configuration
-- Acceptance test scenarios
+Create ESSENTIAL validation mechanisms BEFORE the code they will validate:
+- Key unit tests for critical paths
+- At least one integration test
+- Basic performance benchmarks
+- Initial data quality checks
+- Basic acceptance test scenarios
+Note: Comprehensive coverage comes in separate coverage tasks AFTER migration
 
 ### 3. Migration Tasks (After Validators)
 The actual migration work, which DEPENDS ON validators:
@@ -75,6 +76,14 @@ The actual migration work, which DEPENDS ON validators:
 - API implementation
 - Data migration
 - Integration work
+
+### 4. Coverage Tasks (After Migrations)
+Achieve comprehensive test coverage AFTER migrations are working:
+- Expand tests to 85-95% coverage
+- Add edge cases and error scenarios
+- Performance test hardening
+- Full integration test suites
+- Production-grade validation
 
 ## Dependency Rules
 

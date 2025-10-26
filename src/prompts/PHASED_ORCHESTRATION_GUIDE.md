@@ -1,7 +1,7 @@
 # Phased Migration Plan Generation - Orchestration Guide
 
 ## Overview
-Building a complete migration plan is too complex for a single agent session. We break it into 9 focused phases, each handled by a separate agent session. This ensures accuracy and allows human review between phases.
+Building a complete migration plan is too complex for a single agent session. We break it into 10 focused phases, each handled by a separate agent session. This ensures accuracy and allows human review between phases.
 
 ## The Phases
 
@@ -20,10 +20,10 @@ Building a complete migration plan is too complex for a single agent session. We
 **Output**: Tasks with `depends_on` field populated
 **Key**: Only natural dependencies, allow parallelism
 
-### Phase 4: Validators (phases/phase4_validators.md)
-**Purpose**: Inject test/validation tasks
-**Output**: New validator_* tasks with updated dependencies  
-**Key**: Every migration needs validation FIRST
+### Phase 4: Validator Tasks (phases/phase4_validators.md)
+**Purpose**: Create validator task nodes that build ESSENTIAL tests and at least one integration test
+**Output**: New validator_* task nodes with updated dependencies  
+**Key**: Focus on key tests to guide migration - comprehensive coverage comes later
 
 ### Phase 5: Cleanup #1 (phases/phase5_cleanup.md)
 **Purpose**: Dedupe, fix orphans, renumber
@@ -40,12 +40,17 @@ Building a complete migration plan is too complex for a single agent session. We
 **Output**: Tasks with `action` field (brief and actionable)
 **Key**: Concise, actionable instructions
 
-### Phase 8: Success Criteria (phases/phase8_success_criteria.md)
+### Phase 8: Coverage Tasks (phases/phase8_coverage.md)
+**Purpose**: Create comprehensive test coverage tasks that run AFTER migrations
+**Output**: New coverage_* task nodes for achieving 85-95% test coverage
+**Key**: Expand initial tests to production-grade comprehensive coverage
+
+### Phase 9: Success Criteria (phases/phase9_success_criteria.md)
 **Purpose**: Define completion criteria
 **Output**: Tasks with `definition_of_done` field (1 sentence)
 **Key**: Binary, measurable success metrics
 
-### Phase 9: Final Audit (phases/phase9_final_audit.md)
+### Phase 10: Final Audit (phases/phase10_final_audit.md)
 **Purpose**: Final polish and validation
 **Output**: Production-ready migration plan
 **Key**: Everything validates, nothing missing
@@ -74,11 +79,14 @@ Building a complete migration plan is too complex for a single agent session. We
 7. Run Phase 7 agent with phases/phase7_actions.md prompt
    → Review PR
    
-8. Run Phase 8 agent with phases/phase8_success_criteria.md prompt
+8. Run Phase 8 agent with phases/phase8_coverage.md prompt
    → Review PR
    
-9. Run Final Audit agent with phases/phase9_final_audit.md prompt
-   → Review PR → DONE
+9. Run Phase 9 agent with phases/phase9_success_criteria.md prompt
+   → Review PR
+   
+10. Run Final Audit agent with phases/phase10_final_audit.md prompt
+    → Review PR → DONE
 ```
 
 ## Key Principles
@@ -131,26 +139,29 @@ See `.github/workflows/validate_migration_plan.yml` for the automation setup.
 
 | Issue | Solution | Phase to Fix |
 |-------|----------|--------------|
-| Duplicate tasks | Merge in cleanup phases (5 or 9) | 5, 9 |
-| Missing validators | Add in Phase 4 | 4 |
+| Duplicate tasks | Merge in cleanup phases (5 or 10) | 5, 10 |
+| Missing validator tasks | Add validator task nodes in Phase 4 | 4 |
+| Missing coverage tasks | Add coverage task nodes in Phase 8 | 8 |
 | Wrong dependencies | Fix in Phase 3 or cleanup | 3, 5 |
 | Tasks too large | Split in Phase 2 | 2 |
-| Vague validation | Specify in Phase 6 | 6 |
+| Vague validation_mechanism field | Specify in Phase 6 | 6 |
 | Missing work | Add in any phase when discovered | Any |
-| Circular dependencies | Fix in cleanup phases | 5, 9 |
+| Circular dependencies | Fix in cleanup phases | 5, 10 |
 
 ## Success Metrics
 A good migration plan has:
-- 40-80 tasks total (depending on system size)
-- ~20-30% validator tasks
+- 50-100 tasks total (depending on system size)
+- ~15-20% validator tasks (essential tests)
+- ~10-15% coverage tasks (comprehensive tests) 
 - ~10-15% setup tasks
-- ~50-60% migration tasks
+- ~40-50% migration tasks
 - ~10-15% integration tasks
-- Maximum dependency depth of 5-6 levels
+- Maximum dependency depth of 6-7 levels
 - 3-5 parallel work streams
 
 ## Notes
 - If the system is very large (100+ programs), consider running Phase 1 multiple times for different subsystems
-- For complex integrations, might need a dedicated integration phase after Phase 8
-- The cleanup phases (5 and 9) are critical - don't skip them
+- For complex integrations, might need a dedicated integration phase after Phase 9
+- The cleanup phases (5 and 10) are critical - don't skip them
 - Trust the process - each phase builds on the previous one
+- The three-stage testing approach (validator → migrate → coverage) matches real development patterns
