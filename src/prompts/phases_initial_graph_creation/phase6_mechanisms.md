@@ -12,7 +12,7 @@ Add `validation_mechanism` field to EVERY task. Specify HOW to validate. Be conc
 ## Previous Work Done
 - Phases 1-5: Complete task graph with validators cleaned
 - File exists: `migration_plan.py` with clean structure
-- Every migration has validator tasks, now define HOW they validate
+- Validators depend on migrations (validate AFTER), now define HOW they validate
 
 ## What You Must Do
 1. Load existing `migration_plan.py`
@@ -28,17 +28,17 @@ Add `validation_mechanism` field to EVERY task. Specify HOW to validate. Be conc
 {
     "id": "migrate_001",
     "title": "Migrate Customer Read Operations",
-    "validation_mechanism": "Run validator_001 test suite achieving 90% branch coverage via JaCoCo. Compare response times against baseline metrics. Verify all test fixtures return correct data.",
+    "validation_mechanism": "Validator_001 will verify functionality. Basic smoke tests during development. Full validation happens in validator_001 task.",
     ...
 }
 ```
 
-### For Validator Tasks (they need validation too!)
+### For Validator Tasks (they do the validation!)
 ```python
 {
     "id": "validator_001",
-    "title": "Create Customer Read Test Suite",
-    "validation_mechanism": "JaCoCo reports 90%+ branch coverage on CustomerController and CustomerService. Test suite includes 20+ test cases covering happy path and edge cases. All tests pass in CI pipeline.",
+    "title": "Validate Customer Read Migration",
+    "validation_mechanism": "All tests pass with 90%+ branch coverage via JaCoCo. Response times within 10% of baseline. No functional regressions. Test report generated.",
     ...
 }
 ```
@@ -58,7 +58,7 @@ Add `validation_mechanism` field to EVERY task. Specify HOW to validate. Be conc
 {
     "id": "integrate_001",
     "title": "Customer-Order Integration",
-    "validation_mechanism": "End-to-end tests pass for complete order lifecycle. No orphaned records in database after test runs. Response times within 10% of baseline.",
+    "validation_mechanism": "Validator_004 will run E2E tests. Basic connectivity verified during integration. Full validation in validator_004.",
     ...
 }
 ```
@@ -111,9 +111,9 @@ Add `validation_mechanism` field to EVERY task. Specify HOW to validate. Be conc
 | Task Type | Common Validation Mechanisms |
 |-----------|------------------------------|
 | setup_* | Config files exist, services running, dashboards live |
-| validator_* | Coverage reports, test counts, CI integration |  
-| migrate_* | Tests pass, coverage met, performance within bounds |
-| integrate_* | E2E tests pass, data consistency, no orphans |
+| validator_* | Tests pass, coverage achieved, regressions caught, reports generated |  
+| migrate_* | Code compiles, basic smoke tests pass, validator_X will verify |
+| integrate_* | Services connect, basic flow works, validator_X will verify fully |
 
 ## Output
 Update `migration_plan.py` with validation_mechanism field added to all tasks.

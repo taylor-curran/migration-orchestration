@@ -11,7 +11,7 @@ Clean up the task graph. Remove duplicates, fix orphans, renumber IDs. Make it p
 
 ## Previous Work Done  
 - Phases 1-4: Discovery, splitting, dependencies, validators added
-- File exists: `migration_plan.py` with validators injected
+- File exists: `migration_plan.py` with validators that depend on migrations
 - Likely issues: duplicates, inconsistent numbering, orphaned dependencies
 
 ## What You Must Do
@@ -90,7 +90,7 @@ If any fields are too long, trim them:
 ## What to Preserve
 - **Keep all essential work** - Don't delete tasks just because they seem small
 - **Maintain logical flow** - Dependencies should still make sense
-- **Preserve validators** - Every migration still needs validation
+- **Preserve validators** - Every migration needs validation (validators depend on migrations)
 
 ## Decision Log
 When making significant changes, add a comment:

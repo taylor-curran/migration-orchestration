@@ -61,23 +61,20 @@ Infrastructure and baselines that everything depends on:
 - Development environment setup
 - CI/CD pipeline configuration
 
-### 2. Validator Tasks (Before Each Migration)
-Create ESSENTIAL validation mechanisms BEFORE the code they will validate:
-- Key unit tests for critical paths
-- At least one integration test
-- Basic performance benchmarks
-- Initial data quality checks
-- Basic acceptance test scenarios
-Note: Comprehensive coverage comes in separate coverage tasks AFTER migration
-
-### 3. Migration Tasks (After Validators)
-The actual migration work, which DEPENDS ON validators:
-- Code translation
+### 2. Migration Tasks
+The actual migration work:
+- Code translation from COBOL to Java
 - API implementation
 - Data migration
-- Integration work
+- Service creation
 
-### 4. Coverage Tasks (After Migrations)
+### 3. Validator Tasks (After Migrations)
+Validation that runs AFTER migrations to verify success:
+- Run tests on migrated code
+- Compare performance metrics
+- Verify data integrity
+
+### 4. Coverage Tasks (After Validation)
 Achieve comprehensive test coverage AFTER migrations are working:
 - Expand tests to 85-95% coverage
 - Add edge cases and error scenarios
@@ -87,8 +84,8 @@ Achieve comprehensive test coverage AFTER migrations are working:
 
 ## Dependency Rules
 
-1. **Migration tasks MUST depend on their validators**: If `migrate_customer` needs tests, then `validator_customer_tests` must be a dependency
-2. **Validators can depend on other validators**: Build incrementally (e.g., CRUD tests extend read-only tests)
+1. **Validator tasks MUST depend on their migrations**: Validators run AFTER migrations to verify the migration worked
+2. **Migrations depend on setup tasks**: Need infrastructure before migrating
 3. **Setup tasks have no dependencies**: They establish the foundation
 4. **No circular dependencies**: The graph must be a DAG
 
@@ -96,8 +93,8 @@ Achieve comprehensive test coverage AFTER migrations are working:
 
 **Don't assume 1-to-1 mapping.** Use judgment:
 
-- **One validator → Many migrations**: A comprehensive `validator_customer_tests` can validate both `migrate_customer_read` AND `migrate_customer_write`
-- **One migration → Multiple validators**: Complex `migrate_transaction_processing` may need tests + performance benchmarks + data quality checks
+- **One validator → Many migrations**: A comprehensive `validator_customer` can validate both `migrate_customer_read` AND `migrate_customer_write` after they're complete
+- **One migration → Multiple validators**: Complex `migrate_transaction_processing` may need functional validation + performance validation + data integrity checks
 - **Combine** validators testing the same domain; **Split** when using different techniques (tests vs metrics vs data checks)
 
 ## Task Granularity
@@ -141,52 +138,52 @@ Split when:
             "deliverables": ["monitoring_config.yaml", "dashboard_urls.txt"]
         },
         {
-            "id": "validator_001",
-            "title": "Create Customer Read Test Suite",
-            "content": "Build tests for customer inquiry operations",
-            "status": "not-complete",  # Options: "not-complete", "completed"
-            "depends_on": ["setup_002"],  # Needs monitoring to verify test execution
-            "action": "Achieve 90%+ test coverage for INQCUST and BROWCUST inquiry operations.",
-            "definition_of_done": "Full coverage of read paths including edge cases, error handling",
-            "validation_mechanism": "JaCoCo shows 90%+ branch coverage, all scenarios tested",
-            "estimated_hours": 10,
-            "deliverables": ["CustomerReadTests.java", "test_fixtures.json", "jacoco.gradle"]
-        },
-        {
-            "id": "validator_002", 
-            "title": "Create Customer CRUD Test Suite",
-            "content": "Build tests for customer create/update/delete",
-            "status": "not-complete",  # Options: "not-complete", "completed"
-            "depends_on": ["validator_001"],  # Extends read tests
-            "action": "Test CRECUST, UPDCUST, DELCUST operations with transaction rollback scenarios.",
-            "definition_of_done": "All CRUD paths tested including concurrent access, deadlock handling",
-            "validation_mechanism": "95%+ coverage, transaction integrity verified",
-            "estimated_hours": 10,
-            "deliverables": ["CustomerCrudTests.java", "transaction_fixtures.sql"]
-        },
-        {
             "id": "migrate_001",
             "title": "Migrate Customer Read Operations",
             "content": "Implement customer inquiry endpoints",
             "status": "not-complete",  # Options: "not-complete", "completed"
-            "depends_on": ["setup_001", "setup_002", "validator_001"],  # DEPENDS on tests!
-            "action": "Migrate customer read operations to [TARGET_REPO] using validator_001 tests.",
-            "definition_of_done": "All read operations migrated, tests passing",
-            "validation_mechanism": "validator_001 tests pass, JaCoCo shows 90%+ coverage",
+            "depends_on": ["setup_001", "setup_002"],  # Depends on infrastructure
+            "action": "Migrate customer read operations to [TARGET_REPO].",
+            "definition_of_done": "All read operations migrated and working",
+            "validation_mechanism": "validator_001 will verify functionality after migration",
             "estimated_hours": 8,
             "deliverables": ["CustomerReadController.java", "CustomerReadService.java"]
+        },
+        {
+            "id": "validator_001",
+            "title": "Validate Customer Read Migration",
+            "content": "Test and validate migrated customer read operations",
+            "status": "not-complete",  # Options: "not-complete", "completed"
+            "depends_on": ["migrate_001"],  # Runs AFTER migration
+            "action": "Create and run comprehensive tests for migrated INQCUST and BROWCUST operations.",
+            "definition_of_done": "All tests pass with 90%+ coverage, functionality matches legacy",
+            "validation_mechanism": "JaCoCo reports 90%+ coverage, all tests pass, no regressions",
+            "estimated_hours": 8,
+            "deliverables": ["CustomerReadTests.java", "test_fixtures.json", "test_report.html"]
         },
         {
             "id": "migrate_002",
             "title": "Migrate Customer CRUD Operations", 
             "content": "Implement customer create/update/delete",
             "status": "not-complete",  # Options: "not-complete", "completed"
-            "depends_on": ["migrate_001", "validator_002"],  # DEPENDS on CRUD tests!
+            "depends_on": ["migrate_001"],  # Depends on read operations being migrated
             "action": "Migrate customer CRUD operations preserving transaction boundaries.",
             "definition_of_done": "CRUD operations migrated, transaction handling correct",
-            "validation_mechanism": "validator_002 tests pass, JaCoCo shows 90%+ coverage",
+            "validation_mechanism": "validator_002 will verify CRUD operations after migration",
             "estimated_hours": 12,
             "deliverables": ["CustomerCrudController.java", "CustomerCrudService.java"]
+        },
+        {
+            "id": "validator_002",
+            "title": "Validate Customer CRUD Operations",
+            "content": "Test and validate migrated CRUD operations",
+            "status": "not-complete",  # Options: "not-complete", "completed"
+            "depends_on": ["migrate_002"],  # After CRUD migration
+            "action": "Test CRECUST, UPDCUST, DELCUST operations with transaction rollback scenarios.",
+            "definition_of_done": "All CRUD paths tested, transaction integrity verified",
+            "validation_mechanism": "95%+ coverage, all tests pass, transactions work correctly",
+            "estimated_hours": 10,
+            "deliverables": ["CustomerCrudTests.java", "transaction_test_report.html"]
         },
         {
             "id": "validator_003",
@@ -206,20 +203,20 @@ Split when:
 
 ## Critical Principles
 
-1. **No migration without validation**: Every `migrate_*` task must depend on a `validator_*` task
-2. **Tests are prerequisites, not afterthoughts**: Validators come BEFORE migrations in the dependency graph
+1. **No migration without validation**: Every `migrate_*` task must have a `validator_*` task that runs AFTER it
+2. **Validate what was built**: Validators test the actual migrated code, not mocks
 3. **Measurable validation only**: "Code review" is NOT validation. Tests, metrics, and coverage are.
-4. **Dependencies enforce sequencing**: The graph structure ensures tests exist before code
+4. **Dependencies enforce sequencing**: Migrate first, then validate, then comprehensive coverage
 5. **Every task independently executable**: Actions should be clear and self-contained
 6. **Follow existing guides**: Use developer guides, testing guides, and documentation found in markdown files in the target repo
 7. **Zero tolerance for data accuracy**: Financial/banking systems require EXACT data matching, not "close enough"
 
 ## Common Anti-Patterns to AVOID
 
-❌ **Writing tests after migration** - Tests must exist first
+❌ **Trying to test code that doesn't exist** - Can't validate what hasn't been built
 ❌ **Vague validation** - "Looks good" or "Review code" is not validation  
 ❌ **Missing baselines** - Can't measure improvement without baselines
-❌ **Skipping test creation** - Every migration needs tests
+❌ **Skipping validation** - Every migration needs validation
 ❌ **False dependencies** - Don't create dependencies just to serialize work
 ❌ **Ignoring existing docs** - Always check target repo for guides and patterns
 

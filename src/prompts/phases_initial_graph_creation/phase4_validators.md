@@ -1,14 +1,14 @@
-# Phase 4: Validator Task Creation
+# Phase 4: Post-Migration Validator Task Creation
 
 ## Migration Context
 - **Source Repository**: `[SOURCE_REPO]`
 - **Target Repository**: `[TARGET_REPO]`
 
 ## YOUR ONLY JOB THIS PHASE
-Create validator TASKS (new task nodes like `validator_001`) and inject them before migrations.
+Create validator TASKS (new task nodes like `validator_001`) that run AFTER migrations to validate what was migrated.
 
 **What are validator tasks?**
-Validator tasks are actual task nodes that BUILD validation infrastructure - tests, benchmarks, data quality checks, etc. They're working sessions where an agent creates the tooling needed to validate migrations.
+Validator tasks are actual task nodes that VALIDATE the migrated code - running tests, checking performance, verifying data integrity, etc. They're working sessions where an agent validates that the migration was successful.
 
 ## Previous Work Done
 - Phase 1: Task discovery completed
@@ -19,61 +19,61 @@ Validator tasks are actual task nodes that BUILD validation infrastructure - tes
 ## What You Must Do
 1. Load existing `migration_plan.py`
 2. For each migrate_XXX task, determine what validation it needs
-3. Create new validator_XXX tasks
-4. Update migrate_XXX to depend on its validator(s)
+3. Create new validator_XXX tasks that DEPEND ON the migrations
+4. Validator tasks verify the migration worked correctly
 5. Update task IDs to maintain sequential numbering
 6. Run validation: `python src/utils/validate_graph.py migration_plan.py`
 
 ## The Golden Rule
-**NO MIGRATION WITHOUT VALIDATOR TASKS**
+**NO MIGRATION WITHOUT VALIDATION**
 
-If you're migrating code, you need a validator task that creates **key tests and at least one integration test** FIRST.
-If you're claiming performance, you need a validator task that creates **baseline benchmarks** FIRST.
-If you're moving data, you need a validator task that creates **basic quality checks** FIRST.
+If you migrated code, you need a validator task that **runs tests and verifies correctness** AFTER.
+If you're claiming performance improvement, you need a validator task that **measures and compares metrics** AFTER.
+If you moved data, you need a validator task that **validates data integrity** AFTER.
 
-**Note**: These validators create the ESSENTIAL tests to guide migration. Comprehensive coverage comes later.
+**Note**: We validate AFTER migration because you can't fully test what doesn't exist yet. The migration creates it, then we validate it.
 
 ## Validator Types and Examples
 
-### Test Suite Validators (Key Tests + Integration)
+### Functional Validation (Test Execution)
 ```python
 {
     "id": "validator_001",
-    "title": "Create Customer Read Core Tests",
-    "content": "Build key unit tests for critical paths and at least one integration test for customer inquiry operations. Focus on main success paths and critical error cases.",
+    "title": "Validate Customer Read Operations",
+    "content": "Create and run comprehensive tests for migrated customer operations. Verify INQCUST and BROWCUST functionality matches legacy behavior. Test edge cases discovered during migration.",
     "status": "not-complete",
-    "depends_on": ["setup_001"],  # Validators can have dependencies too
+    "depends_on": ["migrate_001"],  # Validators run AFTER migration
     "estimated_hours": 8
 }
 ```
 
-### Performance Benchmark Validators  
+### Performance Validation  
 ```python
 {
     "id": "validator_002",
-    "title": "Create Transaction Performance Benchmarks",
-    "content": "Build performance test harness. Measure baseline metrics. Define success criteria.",
+    "title": "Validate Transaction Performance",
+    "content": "Run performance benchmarks on migrated transaction code. Compare against legacy baseline. Verify within 10% performance target. Generate comparison report.",
     "status": "not-complete",
-    "depends_on": ["setup_001"],
+    "depends_on": ["migrate_002", "setup_001"],  # Needs migration + baseline
     "estimated_hours": 6
 }
 ```
 
-### Data Quality Validators
+### Data Integrity Validation
 ```python
 {
     "id": "validator_003",
-    "title": "Create Data Migration Validators",
-    "content": "Build data comparison tools. Create checksums. Implement reconciliation reports.",
+    "title": "Validate Data Migration Integrity",
+    "content": "Run data validation on migrated records. Compare checksums with source. Generate reconciliation reports. Verify zero data loss.",
     "status": "not-complete",
-    "depends_on": ["setup_002"],
+    "depends_on": ["migrate_003"],  # Validates the data migration
     "estimated_hours": 10
 }
 ```
 
-## Injection Pattern
+## The New Pattern: Migrate Then Validate
 
-### BEFORE (no validator):
+### BEFORE (just migration):
 ```python
 {
     "id": "migrate_001",
@@ -83,65 +83,68 @@ If you're moving data, you need a validator task that creates **basic quality ch
 }
 ```
 
-### AFTER (validator injected):
+### AFTER (validator added):
 ```python
 {
-    "id": "validator_001",
-    "title": "Create Customer Read Test Suite",
-    "content": "Build tests for INQCUST and BROWCUST operations. Cover all paths. Mock dependencies.",
+    "id": "migrate_001",
+    "title": "Migrate Customer Read Operations",
+    "content": "Port INQCUST and BROWCUST programs to Java.",
     "status": "not-complete",
     "depends_on": ["setup_001", "setup_002"],
     "estimated_hours": 8
 },
 {
-    "id": "migrate_001",
-    "title": "Migrate Customer Read Operations",
-    "depends_on": ["validator_001"],  # NOW DEPENDS ON VALIDATOR!
-    ...
+    "id": "validator_001",
+    "title": "Validate Customer Read Migration",
+    "content": "Test migrated INQCUST and BROWCUST. Verify functionality matches legacy. Add tests for issues found during migration.",
+    "status": "not-complete",
+    "depends_on": ["migrate_001"],  # VALIDATOR DEPENDS ON MIGRATION!
+    "estimated_hours": 8
 }
 ```
 
-## Validator Reuse vs Splitting
+## Validation Patterns
 
-### One Validator → Multiple Migrations (when related)
+### One Validator for Multiple Migrations (when related)
 ```python
-# One comprehensive test suite validates multiple operations
-validator_001 → migrate_001 (customer reads)
-              → migrate_002 (customer search)
-              → migrate_003 (customer browse)
+# One comprehensive validation for related migrations
+migrate_001 (customer reads) → 
+migrate_002 (customer search) → validator_001 (validate all customer ops)
+migrate_003 (customer browse) →
 ```
 
-### Multiple Validators → One Migration (when complex)
+### Multiple Validators for One Migration (when complex)
 ```python
 # Complex migration needs multiple validation types
-validator_001 (unit tests) → 
-validator_002 (perf tests) → migrate_004 (transaction processing)
-validator_003 (data quality) →
+migrate_004 (transaction processing) → validator_001 (functional tests)
+                                     → validator_002 (performance tests)
+                                     → validator_003 (data integrity)
 ```
 
-## Some Setup Tasks May Need Validator Tasks Too!
+## Integration Validation Example
 ```python
 {
     "id": "validator_004",
-    "title": "Create Database Schema Tests",
-    "content": "Build tests to verify all tables created. Check constraints. Test connections.",
+    "title": "Validate Customer-Order Integration",
+    "content": "Test end-to-end workflows across migrated customer and order modules. Verify transaction boundaries. Check for data consistency.",
     "status": "not-complete", 
-    "depends_on": ["setup_002"],  # Tests the setup task
-    "estimated_hours": 4
+    "depends_on": ["migrate_001", "migrate_005"],  # After both migrations
+    "estimated_hours": 10
 }
 ```
 
 ## Important Reminders
-1. **Every migration needs validator tasks** - Create tasks that BUILD the validation infrastructure
-2. **Validator tasks come FIRST** - Update dependencies so validator tasks run before migrations
-3. **Be specific** - "Create Customer Tests" not "Create Tests"
-4. **Add missing validator tasks** - If no validator task exists for a migration, create one
-5. **Renumber IDs** - Keep sequential after insertions (validator_001, validator_002, etc.)
+1. **Every migration needs validation** - Create validator tasks that VERIFY the migration worked
+2. **Validators come AFTER** - Validators depend on migrations being complete
+3. **Be specific** - "Validate Customer Read Operations" not "Run Tests"
+4. **Test what was actually built** - Validators test the real migrated code, not mocks
+5. **Include lessons learned** - Validators test issues discovered during migration
 
 ## What NOT to Do
-- ❌ Skip creating validator tasks ("this one doesn't need tests")
-- ❌ Create validator tasks without connecting them via dependencies
-- ❌ Define HOW to validate - just create the tasks that will build validation
+- ❌ Make migrations depend on validators (migrations come FIRST)
+- ❌ Try to test code that doesn't exist yet
+- ❌ Skip validation because "it worked when we ran it"
+- ❌ Create validators without the migration being complete
 
 ## Validation Check
 After injecting validator tasks, run:
@@ -151,10 +154,10 @@ python src/utils/validate_graph.py migration_plan.py
 
 Ensure:
 - All validator task IDs follow naming convention (validator_001, etc.)
-- All migration tasks depend on at least one validator task
-- No orphaned validator tasks (all connected via dependencies)
+- All validator tasks depend on their corresponding migration tasks
+- Validators run AFTER migrations, not before
 
 ## Output
 Update `migration_plan.py` with:
 1. New validator task nodes added (validator_001, validator_002, etc.)
-2. Migration task dependencies updated to depend on their validator tasks
+2. Validator tasks properly depending on their migration tasks (not vice versa)

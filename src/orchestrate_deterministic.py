@@ -55,8 +55,8 @@ def fetch_migration_plan_from_github(
     logger.info(f"📥 Fetching migration plan from GitHub: {raw_url}")
     
     try:
-        # Download the file content
-        with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
+        # Download the file content (no timeout)
+        with httpx.Client() as client:
             response = client.get(raw_url)
             response.raise_for_status()
             content = response.text
@@ -162,22 +162,19 @@ def wait_for_prs_to_merge(
         
         # Check timeout
         elapsed = time.time() - start_time
-        if elapsed > max_wait_seconds:
-            logger.warning(f"⏱️ Timeout waiting for PRs after {max_wait_minutes} minutes")
-            
-            # Show which PRs are still pending
-            pending = [pr for pr in pr_tracking if not pr["merged"]]
-            if pending:
-                logger.info("📋 Still waiting for:")
-                for pr in pending:
-                    logger.info(f"   • {pr['pr_url']}")
-            
+        if elapsed >= max_wait_seconds:
+            logger.warning(f"⏱️ Timeout after {max_wait_minutes} minutes")
+            unmerged = [pr['pr_url'] for pr in pr_tracking if not pr["merged"]]
+            if unmerged:
+                logger.warning(f"   Unmerged PRs: {', '.join(unmerged)}")
             return False
         
         # Show progress
         merged_count = sum(1 for pr in pr_tracking if pr["merged"])
-        logger.info(f"   Progress: {merged_count}/{len(pr_tracking)} merged (waiting {int(elapsed/60)} minutes)")
+        wait_minutes = int(elapsed / 60)
+        logger.info(f"   Progress: {merged_count}/{len(pr_tracking)} merged (waiting {wait_minutes} minutes)")
         
+        # Wait before next check
         time.sleep(poll_interval)
 
 
@@ -277,6 +274,10 @@ def create_task_prompt(task: Dict[str, Any], parallel_context: List[Dict[str, An
 - Create tests if this is a validator task
 - Update migration_plan.py to mark this task as "complete" when done
 - Create a PR with your changes
+
+## Repository Context
+**Target Repository**: taylor-curran/target-springboot-cics
+**Source Repository**: taylor-curran/og-cics-cobol-app
 """
 
 
@@ -306,9 +307,9 @@ def execute_task(task_dict: Dict[str, Any], prompt: str) -> Dict[str, Any]:
     }
 
 
-@task(name="Run Merge Conflict Resolution")
-def run_merge_conflict_resolution(batch_results: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Run a session to fix merge conflicts and build failures."""
+@task(name="Run PR Compatibility Check")
+def run_pr_compatibility_check(batch_results: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Run a Devin session to analyze and ensure PR compatibility from parallel tasks."""
     logger = get_run_logger()
     
     # Collect all PR URLs
@@ -318,12 +319,11 @@ def run_merge_conflict_resolution(batch_results: List[Dict[str, Any]]) -> Dict[s
             for pr in result['prs']:
                 if pr.get('pr_url'):
                     pr_list.append(f"- {pr['pr_url']}")
-    
+    # No PRs found in any results
     if not pr_list:
-        logger.info("📭 No PRs to fix")
-        return {}
+        logger.info("ℹ️ No PRs found in batch results, skipping compatibility check")
+        return None
     
-    # Load merge conflict resolution prompt
     prompt_path = Path(__file__).parent / "prompts" / "merge_conflict_resolution.md"
     prompt_template = prompt_path.read_text()
     
@@ -331,14 +331,17 @@ def run_merge_conflict_resolution(batch_results: List[Dict[str, Any]]) -> Dict[s
     prompt = prompt_template.replace("[TARGET_REPO]", "target-springboot-cics")
     prompt = prompt.replace("[PR_LIST]", "\n".join(pr_list))
     
-    logger.info(f"🔧 Running merge conflict resolution for {len(pr_list)} PRs")
+    # Add repository context at the end
+    prompt += "\n\n## Repository Context\n**Primary Focus - Target Repository**: taylor-curran/target-springboot-cics\nThis is where all merge conflicts should be resolved and where the migrated code lives.\n\n**Context - Source Repository**: taylor-curran/og-cics-cobol-app\nThis is the original COBOL CICS application being migrated from (for reference only)."
+    
+    logger.info(f"🔧 Running PR compatibility analysis for {len(pr_list)} PRs")
     
     result = run_session_and_wait_for_analysis(
         prompt=prompt,
-        title="Fix merge conflicts and build failures"
+        title="Ensure PR compatibility and integration"
     )
     
-    logger.info(f"✅ Merge conflict resolution complete")
+    logger.info(f"✅ PR compatibility check complete")
     logger.info(f"   Session: {result['session_url']}")
     
     # Extract session ID
@@ -346,7 +349,7 @@ def run_merge_conflict_resolution(batch_results: List[Dict[str, Any]]) -> Dict[s
     session_id = session_url.split('/')[-1] if '/sessions/' in session_url else None
     
     return {
-        "task_id": "merge_conflict_fix",
+        "task_id": "pr_compatibility_check",
         "session_url": session_url,
         "session_id": session_id,
         "prs": result.get('prs', [])
@@ -365,6 +368,9 @@ def run_phase11_verification() -> Dict[str, Any]:
     # Replace placeholders
     prompt = prompt_template.replace("[SOURCE_REPO]", "legacy-cobol-cics")
     prompt = prompt_template.replace("[TARGET_REPO]", "target-springboot-cics")
+    
+    # Add repository context at the end
+    prompt += "\n\n## Repository Context\n**Target Repository**: taylor-curran/target-springboot-cics\n**Source Repository**: taylor-curran/og-cics-cobol-app"
     
     logger.info("🔍 Running Phase 11: Completion Verification")
     
@@ -568,15 +574,18 @@ def orchestrate_migration(
                     for pr in result['prs']:
                         logger.info(f"     PR: {pr.get('pr_url', 'Unknown URL')}")
             
-            # Step 5: Run merge conflict resolution if PRs were created
-            if any(r.get('prs') for r in batch_results):
-                logger.info("\n🔧 Running merge conflict resolution session...")
-                conflict_result = run_merge_conflict_resolution(batch_results)
-                if conflict_result:
-                    all_results.append(conflict_result)
-                    # Add conflict resolution PR to batch results for tracking
-                    if conflict_result.get('prs'):
-                        batch_results.append(conflict_result)
+            # Step 5: Always run PR compatibility check after parallel batch
+            logger.info("\n🔍 Running PR compatibility and integration check...")
+            logger.info("   Analyzing interactions between parallel PRs...")
+            compatibility_result = run_pr_compatibility_check(batch_results)
+            if compatibility_result:
+                all_results.append(compatibility_result)
+                # Add compatibility check PR to batch results for tracking
+                if compatibility_result.get('prs'):
+                    batch_results.append(compatibility_result)
+                logger.info(f"   Compatibility session: {compatibility_result['session_url']}")
+            else:
+                logger.info("   No PRs to analyze in this batch")
             
             # Step 6: Wait for all PRs to be merged
             logger.info("\n⏳ Waiting for PRs to be merged by human reviewer...")

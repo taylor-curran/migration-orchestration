@@ -38,10 +38,10 @@ Final audit. Fix any remaining issues. Add deliverables. Make it production-read
 - [ ] All required fields present
 
 ### Logical Validation
-- [ ] Every migrate_* has at least one validator_* dependency
+- [ ] Every migrate_* has at least one validator_* that depends on it
 - [ ] Every integrate_* depends on its component migrate_* tasks
 - [ ] Setup tasks generally have no dependencies
-- [ ] No orphaned validators (validators that nothing depends on)
+- [ ] Validators depend on their corresponding migration tasks
 
 ### Coverage Check
 - [ ] All COBOL programs accounted for
@@ -92,9 +92,9 @@ One last check for sneaky duplicates:
 
 ### The Validator Rule
 ```python
-# Every migration MUST have validation
-for task in migration_tasks:
-    assert any(validator in task.depends_on for validator in validator_tasks)
+# Every migration MUST have validation that runs AFTER it
+for migrate_task in migration_tasks:
+    assert any(migrate_task.id in validator.depends_on for validator in validator_tasks)
 ```
 
 ### The Sandbox Rule

@@ -77,7 +77,8 @@ def create_session(
             f"Added schema fields to request: {list(structured_output_schema.keys())}"
         )
 
-    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
+    # No timeout - let session creation take as long as needed
+    with httpx.Client() as client:
         response = client.post(url, headers=headers, json=data)
         response.raise_for_status()
 
@@ -98,7 +99,20 @@ def get_session_status(api_key: str, session_id: str) -> Dict[str, Any]:
     url = f"https://api.devin.ai/v1/sessions/{session_id}"
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
+    with httpx.Client() as client:
+        response = client.get(url, headers=headers)
+        response.raise_for_status()
+
+    return response.json()
+
+
+def get_session_info(api_key: str, session_id: str) -> Dict[str, Any]:
+    """Get session information."""
+    url = f"https://api.devin.ai/v1/sessions/{session_id}"
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    # No timeout for status checks
+    with httpx.Client() as client:
         response = client.get(url, headers=headers)
         response.raise_for_status()
 
@@ -113,7 +127,8 @@ def send_sleep_message(api_key: str, session_id: str) -> None:
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     data = {"message": "sleep"}
 
-    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
+    # No timeout - let session creation take as long as needed
+    with httpx.Client() as client:
         response = client.post(url, headers=headers, json=data)
         response.raise_for_status()
 
@@ -197,13 +212,32 @@ def wait_for_status(
         time.sleep(poll_interval)
 
 
+def get_session_structured_output(api_key: str, session_id: str) -> Optional[Dict[str, Any]]:
+    """Get session structured output."""
+    url = f"https://api.devin.ai/v1/sessions/{session_id}"
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    # No timeout for structured output fetches
+    with httpx.Client() as client:
+        response = client.get(url, headers=headers)
+        response.raise_for_status()
+
+    session_data = response.json()
+    return session_data.get("structured_output")
+
+
 def get_enterprise_session_data(api_key: str, session_id: str) -> Dict[str, Any]:
     """Get full enterprise session data including PRs and analysis."""
+    
+    # Ensure session_id has the 'devin-' prefix for enterprise API
+    if not session_id.startswith('devin-'):
+        session_id = f'devin-{session_id}'
 
     url = f"https://api.devin.ai/beta/v2/enterprise/sessions/{session_id}"
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
+    # No timeout for enterprise data fetches
+    with httpx.Client() as client:
         response = client.get(url, headers=headers)
         response.raise_for_status()
 
@@ -236,18 +270,6 @@ def wait_for_analysis(
         time.sleep(poll_interval)
 
 
-def get_structured_output(api_key: str, session_id: str) -> Optional[Dict[str, Any]]:
-    """Get structured output from session if available."""
-
-    url = f"https://api.devin.ai/v1/sessions/{session_id}"
-    headers = {"Authorization": f"Bearer {api_key}"}
-
-    with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
-        response = client.get(url, headers=headers)
-        response.raise_for_status()
-
-    session_data = response.json()
-    return session_data.get("structured_output")
 
 
 @task(name="Devin Working")

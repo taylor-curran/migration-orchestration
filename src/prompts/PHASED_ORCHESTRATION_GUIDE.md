@@ -20,10 +20,10 @@ Building a complete migration plan is too complex for a single agent session. We
 **Output**: Tasks with `depends_on` field populated
 **Key**: Only natural dependencies, allow parallelism
 
-### Phase 4: Validator Tasks (phases/phase4_validators.md)
-**Purpose**: Create validator task nodes that build ESSENTIAL tests and at least one integration test
-**Output**: New validator_* task nodes with updated dependencies  
-**Key**: Focus on key tests to guide migration - comprehensive coverage comes later
+### Phase 4: Post-Migration Validators (phases/phase4_validators.md)
+**Purpose**: Create validator tasks that VALIDATE migrations after they're complete
+**Output**: New validator_* task nodes that depend on migration tasks  
+**Key**: Validators run AFTER migration to verify the migration worked correctly
 
 ### Phase 5: Cleanup #1 (phases/phase5_cleanup.md)
 **Purpose**: Dedupe, fix orphans, renumber
@@ -40,10 +40,10 @@ Building a complete migration plan is too complex for a single agent session. We
 **Output**: Tasks with `action` field (brief and actionable)
 **Key**: Concise, actionable instructions
 
-### Phase 8: Coverage Tasks (phases/phase8_coverage.md)
-**Purpose**: Create comprehensive test coverage tasks that run AFTER migrations
-**Output**: New coverage_* task nodes for achieving 85-95% test coverage
-**Key**: Expand initial tests to production-grade comprehensive coverage
+### Phase 8: Comprehensive Test Coverage (phases/phase8_coverage.md)
+**Purpose**: Create comprehensive test suites after migration is validated
+**Output**: New coverage_* task nodes that depend on both migration and validation
+**Key**: Build exhaustive test suites for long-term CI/CD and maintenance
 
 ### Phase 9: Success Criteria (phases/phase9_success_criteria.md)
 **Purpose**: Define completion criteria
@@ -140,7 +140,7 @@ See `.github/workflows/validate_migration_plan.yml` for the automation setup.
 | Issue | Solution | Phase to Fix |
 |-------|----------|--------------|
 | Duplicate tasks | Merge in cleanup phases (5 or 10) | 5, 10 |
-| Missing validator tasks | Add validator task nodes in Phase 4 | 4 |
+| Missing validators | Add validator tasks that depend on migrations | 4 |
 | Missing coverage tasks | Add coverage task nodes in Phase 8 | 8 |
 | Wrong dependencies | Fix in Phase 3 or cleanup | 3, 5 |
 | Tasks too large | Split in Phase 2 | 2 |
@@ -151,7 +151,7 @@ See `.github/workflows/validate_migration_plan.yml` for the automation setup.
 ## Success Metrics
 A good migration plan has:
 - 50-100 tasks total (depending on system size)
-- ~15-20% validator tasks (essential tests)
+- ~15-20% validator tasks (post-migration validation)
 - ~10-15% coverage tasks (comprehensive tests) 
 - ~10-15% setup tasks
 - ~40-50% migration tasks
@@ -164,4 +164,4 @@ A good migration plan has:
 - For complex integrations, might need a dedicated integration phase after Phase 9
 - The cleanup phases (5 and 10) are critical - don't skip them
 - Trust the process - each phase builds on the previous one
-- The three-stage testing approach (validator → migrate → coverage) matches real development patterns
+- The migrate-first approach (migrate → validate → coverage) matches real migration patterns where you validate what was built

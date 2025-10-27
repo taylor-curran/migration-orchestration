@@ -100,7 +100,7 @@ If tasks CAN run in parallel, they SHOULD. Don't add false dependencies.
     "title": "Migrate Customer Read Operations",
     "content": "Port INQCUST and BROWCUST programs.",
     "status": "not-complete",
-    "depends_on": ["setup_001", "setup_002"],  # Needs DB and baselines
+    "depends_on": ["setup_001", "setup_002"],  # Needs DB and infrastructure
     "estimated_hours": 8
 }
 ```
@@ -111,10 +111,11 @@ If tasks CAN run in parallel, they SHOULD. Don't add false dependencies.
 3. **Keep existing work** - Just add depends_on field
 4. **Add tasks if needed** - If you realize a prerequisite is missing, add it
 5. **Validate the DAG** - Must pass validation script
+6. **Migration tasks don't wait for validators** - We validate AFTER migration, not before
 
 ## What NOT to Do
-- ❌ Add validators yet (Phase 4 will do this)
-- ❌ Add validation mechanisms (Phase 5 will do this)
+- ❌ Add validators as prerequisites to migrations (validators come AFTER)
+- ❌ Add validation mechanisms (Phase 6 will do this)
 - ❌ Create circular dependencies (A→B→C→A)
 - ❌ Over-serialize tasks that could run in parallel
 

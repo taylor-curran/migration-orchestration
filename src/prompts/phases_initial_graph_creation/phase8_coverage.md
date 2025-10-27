@@ -1,34 +1,34 @@
-# Phase 8: Comprehensive Coverage Tasks
+# Phase 8: Comprehensive Test Coverage Tasks
 
 ## Migration Context
 - **Source Repository**: `[SOURCE_REPO]`
 - **Target Repository**: `[TARGET_REPO]`
 
 ## YOUR ONLY JOB THIS PHASE
-Create coverage tasks that achieve comprehensive test coverage AFTER migrations.
+Create coverage tasks that build comprehensive test suites AFTER validation proves the migration works.
 
 **What are coverage tasks?**
-Coverage tasks are post-migration tasks that take the initial tests created by validator tasks and expand them to achieve comprehensive coverage, add edge cases, and ensure production readiness.
+Coverage tasks are post-validation tasks that create exhaustive test suites. Once we know the migration works (via validators), we build comprehensive tests for long-term maintenance and CI/CD.
 
 ## Previous Work Done
-- Phases 1-7: Complete task graph with validators, migrations, and actions defined
-- File exists: `migration_plan.py` with migrations that have basic validator tests
-- Migrations can be executed with essential tests, now we ensure comprehensive coverage
+- Phases 1-7: Complete task graph with migrations and validators
+- File exists: `migration_plan.py` with migrations validated by validator tasks
+- Validators have proven migrations work, now we build comprehensive test suites
 
 ## What You Must Do
 1. Load existing `migration_plan.py`
-2. For each migrate_XXX task, check if it needs a coverage task
-3. Create new coverage_XXX tasks that depend on their migrate_XXX tasks
-4. Focus on achieving 85-95% test coverage and production stability
+2. For each migrate_XXX task, check if it needs comprehensive test coverage
+3. Create new coverage_XXX tasks that depend on BOTH migrate_XXX AND validator_XXX
+4. Focus on achieving 85-95% test coverage for long-term maintainability
 5. Update task IDs to maintain sequential numbering
 6. Run validation: `python src/utils/validate_graph.py migration_plan.py`
 
 ## The Coverage Philosophy
-**MIGRATIONS GET REFINED, THEN HARDENED**
+**MIGRATE → VALIDATE → COMPREHENSIVE TESTING**
 
-1. **Validator tasks** (Phase 4) = Essential tests to guide migration
-2. **Migration tasks** (existing) = Do the migration, refine tests as needed
-3. **Coverage tasks** (THIS PHASE) = Achieve comprehensive coverage post-migration
+1. **Migration tasks** = Port the code to the new system
+2. **Validator tasks** = Verify the migration works correctly
+3. **Coverage tasks** (THIS PHASE) = Build comprehensive test suites for the future
 
 ## Coverage Task Types and Examples
 
@@ -39,7 +39,7 @@ Coverage tasks are post-migration tasks that take the initial tests created by v
     "title": "Achieve Customer Module Full Coverage",
     "content": "Expand customer tests to 90%+ coverage. Add edge cases, error scenarios, boundary conditions, and negative tests.",
     "status": "not-complete",
-    "depends_on": ["migrate_001"],  # Depends on the migration being done
+    "depends_on": ["migrate_001", "validator_001"],  # After migration AND validation
     "estimated_hours": 10
 }
 ```
@@ -51,7 +51,7 @@ Coverage tasks are post-migration tasks that take the initial tests created by v
     "title": "Customer Integration Test Suite",
     "content": "Create comprehensive integration tests covering all customer workflows, cross-module interactions, and end-to-end scenarios.",
     "status": "not-complete",
-    "depends_on": ["migrate_001", "migrate_002"],  # After related migrations
+    "depends_on": ["migrate_001", "migrate_002", "validator_001"],  # After migrations and validation
     "estimated_hours": 12
 }
 ```
@@ -63,7 +63,7 @@ Coverage tasks are post-migration tasks that take the initial tests created by v
     "title": "Customer Performance Test Suite",
     "content": "Comprehensive load tests, stress tests, and performance regression suite. Establish performance baselines and alerts.",
     "status": "not-complete",
-    "depends_on": ["migrate_003"],
+    "depends_on": ["migrate_003", "validator_002"],  # After migration and validation
     "estimated_hours": 8
 }
 ```
@@ -75,7 +75,7 @@ Coverage tasks are post-migration tasks that take the initial tests created by v
     "title": "Customer Data Integrity Suite",
     "content": "Build comprehensive data validation including referential integrity, constraint validation, and data migration verification.",
     "status": "not-complete",
-    "depends_on": ["migrate_004"],
+    "depends_on": ["migrate_004", "validator_003"],  # After migration and validation
     "estimated_hours": 8
 }
 ```
@@ -114,16 +114,16 @@ coverage_003 → Payment module coverage
 - Full integration suite: 10-14 hours
 
 ## Important Reminders
-1. **Coverage comes AFTER migration** - These tasks depend on migrate_XXX tasks
-2. **Group related work** - One coverage task can cover multiple small migrations
-3. **Be specific** - "Customer Module Coverage" not "Add More Tests"
-4. **Include integration** - Don't just focus on unit tests
-5. **Production ready** - These tasks make the code production-grade
+1. **Coverage comes LAST** - After migration AND validation
+2. **Build for the future** - These tests will run in CI/CD forever
+3. **Be comprehensive** - Edge cases, error handling, performance tests
+4. **Don't duplicate validator work** - Validators proved it works, coverage makes it bulletproof
+5. **Production ready** - These tasks create the full test harness
 
 ## What NOT to Do
-- ❌ Create coverage tasks for setup or validator tasks (they don't need it)
-- ❌ Duplicate work already in validator tasks
-- ❌ Create coverage before migration (that's what validators are for)
+- ❌ Create coverage before validation completes
+- ❌ Duplicate validation work (validators already proved it works)
+- ❌ Skip coverage because "validators already tested it" (different purposes)
 
 ## Validation Check
 After adding coverage tasks, run:
@@ -133,8 +133,8 @@ python src/utils/validate_graph.py migration_plan.py
 
 Ensure:
 - All coverage task IDs follow naming convention (coverage_001, etc.)
-- Coverage tasks depend on their corresponding migrations
-- No coverage tasks for non-migration work
+- Coverage tasks depend on BOTH migrations AND validators
+- Coverage focuses on comprehensive testing, not basic validation
 
 ## Output
 Update `migration_plan.py` with:
