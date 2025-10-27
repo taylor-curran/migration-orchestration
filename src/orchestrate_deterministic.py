@@ -21,7 +21,7 @@ load_dotenv()
 
 # Add parent to path
 sys.path.append(str(Path(__file__).parent.parent))
-from src.tasks.run_sessions import run_session_and_wait_for_analysis, get_enterprise_session_data
+from src.tasks.run_sessions import run_session_and_wait_for_pr, get_enterprise_session_data
 from src.utils.parallel_detector import ParallelDetector, analyze_tasks
 
 
@@ -55,8 +55,8 @@ def fetch_migration_plan_from_github(
     logger.info(f"📥 Fetching migration plan from GitHub: {raw_url}")
     
     try:
-        # Download the file content (no timeout)
-        with httpx.Client() as client:
+        # Download the file content (no timeout - be patient)
+        with httpx.Client(timeout=None) as client:
             response = client.get(raw_url)
             response.raise_for_status()
             content = response.text
@@ -287,9 +287,10 @@ def execute_task(task_dict: Dict[str, Any], prompt: str) -> Dict[str, Any]:
     logger = get_run_logger()
     logger.info(f"🚀 Starting: {task_dict['id']} - {task_dict['title']}")
     
-    result = run_session_and_wait_for_analysis(
+    result = run_session_and_wait_for_pr(
         prompt=prompt,
-        title=f"{task_dict['id']}: {task_dict['title'][:50]}"
+        title=f"{task_dict['id']}: {task_dict['title'][:50]}",
+        max_wait_for_pr=600  # Wait up to 10 minutes for PR
     )
     
     logger.info(f"✅ Completed: {task_dict['id']}")
@@ -336,9 +337,10 @@ def run_pr_compatibility_check(batch_results: List[Dict[str, Any]]) -> Optional[
     
     logger.info(f"🔧 Running PR compatibility analysis for {len(pr_list)} PRs")
     
-    result = run_session_and_wait_for_analysis(
+    result = run_session_and_wait_for_pr(
         prompt=prompt,
-        title="Ensure PR compatibility and integration"
+        title="Ensure PR compatibility and integration",
+        max_wait_for_pr=300  # Wait up to 5 minutes for PR
     )
     
     logger.info(f"✅ PR compatibility check complete")
@@ -374,9 +376,10 @@ def run_phase11_verification() -> Dict[str, Any]:
     
     logger.info("🔍 Running Phase 11: Completion Verification")
     
-    result = run_session_and_wait_for_analysis(
+    result = run_session_and_wait_for_pr(
         prompt=prompt,
-        title="Phase 11: Verify task completion status"
+        title="Phase 11: Verify task completion status",
+        max_wait_for_pr=300  # Wait up to 5 minutes for PR
     )
     
     logger.info(f"✅ Phase 11 complete")

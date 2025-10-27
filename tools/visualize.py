@@ -98,26 +98,35 @@ def infer_task_category(task: Dict[str, Any]) -> str:
         return "other"
 
 
-def escape_text(text: str) -> str:
-    """Escape text for Mermaid/HTML display."""
-    return text.replace('"', "'").replace("\n", " ").replace("(", "").replace(")", "")
+def escape_text(text: str, max_len: int = 60) -> str:
+    """Escape text for Mermaid/HTML display with better formatting."""
+    # Clean up the text
+    text = text.replace('"', "'").replace("\n", " ").replace("\r", " ")
+    text = text.replace("(", "[").replace(")", "]")
+    
+    # Truncate if needed
+    if len(text) > max_len:
+        text = text[:max_len-3] + "..."
+    
+    return text
 
 
 def generate_mermaid_code(tasks: List[Dict[str, Any]], analysis: Dict[str, Any]) -> str:
     """Generate Mermaid diagram with parallel group visualization."""
     lines = []
-    lines.append("graph TD")
+    lines.append("%%{init: {'theme':'default', 'themeVariables': { 'fontSize': '16px'}}}%%")
+    lines.append("graph TB")
     lines.append("")
 
-    # Style definitions
+    # Style definitions with better colors and readability
     lines.append("    %% Style definitions")
-    lines.append("    classDef setup fill:#e1f5fe,stroke:#01579b,stroke-width:2px")
-    lines.append("    classDef validator fill:#f0e7ff,stroke:#6a1b9a,stroke-width:2px")
-    lines.append("    classDef migration fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px")
-    lines.append("    classDef other fill:#fff9c4,stroke:#f57f17,stroke-width:2px")
-    lines.append("    classDef critical stroke:#ff0000,stroke-width:4px")
+    lines.append("    classDef setup fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:#000")
+    lines.append("    classDef validator fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000")
+    lines.append("    classDef migration fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#000")
+    lines.append("    classDef other fill:#fff9c4,stroke:#f57c00,stroke-width:2px,color:#000")  
+    lines.append("    classDef critical stroke:#c62828,stroke-width:4px")
     lines.append(
-        "    classDef parallel fill:#fce4ec,stroke:#c2185b,stroke-width:3px,stroke-dasharray: 5 5"
+        "    classDef parallel stroke:#ad1457,stroke-width:3px,stroke-dasharray: 5 5"
     )
     lines.append("")
 
@@ -129,35 +138,56 @@ def generate_mermaid_code(tasks: List[Dict[str, Any]], analysis: Dict[str, Any])
     # Track critical path
     critical_path = set(analysis.get("critical_path", []))
 
-    # Add task nodes
+    # Add task nodes with clean, simple formatting
     lines.append("    %% Task nodes")
     for task in tasks:
         task_id = task["id"]
-        title = escape_text(task.get("title", task.get("content", "Task"))[:40])
+        title = task.get("title", task.get("content", "Task"))
         hours = task.get("estimated_hours", 8)
         category = infer_task_category(task)
-
-        # Build label
-        label_parts = [task_id, title + "...", f"{hours}h"]
-
-        # Add validation mechanism indicator if it's a validator task
-        if category == "validator" and task.get("validation_mechanism"):
-            label_parts.append(
-                "✓ " + escape_text(task["validation_mechanism"][:30]) + "..."
-            )
-
-        label = "\\n".join(label_parts)
-
-        # Determine node shape based on category
+        status = task.get("status", "not-complete")
+        
+        # Clean title - remove special chars and truncate if needed
+        clean_title = title.replace('"', "'").replace("\n", " ")
+        if len(clean_title) > 40:
+            # Find a good break point
+            words = clean_title.split()
+            line1 = ""
+            line2 = ""
+            
+            for word in words:
+                if len(line1) < 25:
+                    line1 = (line1 + " " + word).strip()
+                else:
+                    line2 = (line2 + " " + word).strip()
+            
+            if line2:
+                if len(line2) > 25:
+                    line2 = line2[:22] + "..."
+                clean_title = line1 + "\n" + line2
+            else:
+                clean_title = line1[:37] + "..."
+        
+        # Build simple label using line breaks that Mermaid understands
+        if status == "complete":
+            label = f"{task_id.upper()}\n{clean_title}\n({hours}h) ✓"
+        else:
+            label = f"{task_id.upper()}\n{clean_title}\n({hours}h)"
+        
+        # Use simpler node syntax for better compatibility
         if category == "validator":
-            node = f'{task_id}["{label}"]:::validator'
+            # Hexagon for validators
+            node = f'{task_id}{{{{"{label}"}}}}:::validator'
         elif category == "setup":
-            node = f'{task_id}["{label}"]:::setup'
+            # Stadium shape for setup  
+            node = f'{task_id}(["{label}"]):::setup'
         elif category == "migration":
+            # Rectangle for migration
             node = f'{task_id}["{label}"]:::migration'
         else:
-            node = f'{task_id}["{label}"]:::other'
-
+            # Round edges for other
+            node = f'{task_id}("{label}"):::other'
+        
         lines.append(f"    {node}")
 
         # Add critical path styling
@@ -224,7 +254,7 @@ def generate_html(tasks: List[Dict[str, Any]], analysis: Dict[str, Any]) -> str:
             min-height: 100vh;
         }}
         .container {{
-            max-width: 1400px;
+            max-width: 1800px;
             margin: 0 auto;
         }}
         .header {{
@@ -289,6 +319,7 @@ def generate_html(tasks: List[Dict[str, Any]], analysis: Dict[str, Any]) -> str:
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             overflow: auto;
             margin-bottom: 30px;
+            min-height: 800px;
         }}
         .efficiency {{
             background: white;
@@ -454,9 +485,11 @@ def generate_html(tasks: List[Dict[str, Any]], analysis: Dict[str, Any]) -> str:
             theme: 'default',
             flowchart: {{
                 useMaxWidth: true,
-                htmlLabels: true,
+                htmlLabels: false,
                 curve: 'basis',
-                padding: 20
+                padding: 20,
+                nodeSpacing: 80,
+                rankSpacing: 80
             }}
         }});
     </script>

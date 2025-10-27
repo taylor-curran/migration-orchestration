@@ -14,7 +14,7 @@
             min-height: 100vh;
         }
         .container {
-            max-width: 1400px;
+            max-width: 1800px;
             margin: 0 auto;
         }
         .header {
@@ -79,6 +79,7 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             overflow: auto;
             margin-bottom: 30px;
+            min-height: 800px;
         }
         .efficiency {
             background: white;
@@ -210,67 +211,114 @@
         
         <div class="diagram-container">
             <div class="mermaid">
-graph TD
+%%{init: {'theme':'default', 'themeVariables': { 'fontSize': '16px'}}}%%
+graph TB
 
     %% Style definitions
-    classDef setup fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef validator fill:#f0e7ff,stroke:#6a1b9a,stroke-width:2px
-    classDef migration fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    classDef other fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    classDef critical stroke:#ff0000,stroke-width:4px
-    classDef parallel fill:#fce4ec,stroke:#c2185b,stroke-width:3px,stroke-dasharray: 5 5
+    classDef setup fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:#000
+    classDef validator fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
+    classDef migration fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#000
+    classDef other fill:#fff9c4,stroke:#f57c00,stroke-width:2px,color:#000
+    classDef critical stroke:#c62828,stroke-width:4px
+    classDef parallel stroke:#ad1457,stroke-width:3px,stroke-dasharray: 5 5
 
     %% Task nodes
-    setup_001["setup_001\nCreate Performance Baselines...\n8h"]:::setup
+    setup_001(["SETUP_001
+Create Performance Baselines
+(8h)"]):::setup
     class setup_001 parallel
-    setup_002["setup_002\nSetup Local SQLite Database...\n6h"]:::setup
+    setup_002(["SETUP_002
+Setup Local SQLite Database
+(6h)"]):::setup
     class setup_002 critical
     class setup_002 parallel
-    setup_003["setup_003\nConfigure Local Monitoring...\n6h"]:::setup
+    setup_003(["SETUP_003
+Configure Local Monitoring
+(6h)"]):::setup
     class setup_003 parallel
-    validator_001["validator_001\nCreate Database Schema Tests...\n6h\n✓ JUnit test suite with 15+ test..."]:::validator
+    validator_001{{"VALIDATOR_001
+Create Database Schema Tests
+(6h)"}}:::validator
     class validator_001 critical
-    validator_002["validator_002\nCreate Customer Read Test Suite...\n8h\n✓ JaCoCo reports 90%+ branch cov..."]:::validator
+    validator_002{{"VALIDATOR_002
+Create Customer Read Test Suite
+(8h)"}}:::validator
     class validator_002 critical
     class validator_002 parallel
-    migrate_001["migrate_001\nMigrate Customer Read Operations...\n8h"]:::migration
+    migrate_001["MIGRATE_001
+Migrate Customer Read Operations
+(8h)"]:::migration
     class migrate_001 critical
     class migrate_001 parallel
-    validator_003["validator_003\nCreate Customer Create Test Suite...\n10h\n✓ JaCoCo reports 90%+ branch cov..."]:::validator
+    validator_003{{"VALIDATOR_003
+Create Customer Create Test Suite
+(10h)"}}:::validator
     class validator_003 parallel
-    migrate_002["migrate_002\nMigrate Customer Create Operations...\n12h"]:::migration
+    migrate_002["MIGRATE_002
+Migrate Customer Create Operations
+(12h)"]:::migration
     class migrate_002 critical
-    validator_004["validator_004\nCreate Customer Update/Delete Test Suite...\n8h\n✓ JaCoCo reports 90%+ branch cov..."]:::validator
+    validator_004{{"VALIDATOR_004
+Create Customer Update/Delete Test Suite
+(8h)"}}:::validator
     class validator_004 parallel
-    migrate_003["migrate_003\nMigrate Customer Update Delete...\n10h"]:::migration
+    migrate_003["MIGRATE_003
+Migrate Customer Update Delete
+(10h)"]:::migration
     class migrate_003 parallel
-    validator_005["validator_005\nCreate Account Read Test Suite...\n8h\n✓ JaCoCo reports 90%+ branch cov..."]:::validator
+    validator_005{{"VALIDATOR_005
+Create Account Read Test Suite
+(8h)"}}:::validator
     class validator_005 parallel
-    migrate_004["migrate_004\nMigrate Account Read Operations...\n8h"]:::migration
+    migrate_004["MIGRATE_004
+Migrate Account Read Operations
+(8h)"]:::migration
     class migrate_004 parallel
-    validator_006["validator_006\nCreate Account Create Test Suite...\n9h\n✓ JaCoCo reports 90%+ branch cov..."]:::validator
+    validator_006{{"VALIDATOR_006
+Create Account Create Test Suite
+(9h)"}}:::validator
     class validator_006 parallel
-    migrate_005["migrate_005\nMigrate Account Create Operations...\n10h"]:::migration
+    migrate_005["MIGRATE_005
+Migrate Account Create Operations
+(10h)"]:::migration
     class migrate_005 critical
     class migrate_005 parallel
-    validator_007["validator_007\nCreate Account Update/Delete Test Suite...\n8h\n✓ JaCoCo reports 90%+ branch cov..."]:::validator
+    validator_007{{"VALIDATOR_007
+Create Account Update/Delete Test Suite
+(8h)"}}:::validator
     class validator_007 parallel
-    migrate_006["migrate_006\nMigrate Account Update Delete...\n9h"]:::migration
+    migrate_006["MIGRATE_006
+Migrate Account Update Delete
+(9h)"]:::migration
     class migrate_006 parallel
-    validator_008["validator_008\nCreate Transfer Funds Test Suite...\n10h\n✓ JaCoCo reports 90%+ branch cov..."]:::validator
+    validator_008{{"VALIDATOR_008
+Create Transfer Funds Test Suite
+(10h)"}}:::validator
     class validator_008 parallel
-    migrate_007["migrate_007\nMigrate Transfer Funds Operations...\n12h"]:::migration
+    migrate_007["MIGRATE_007
+Migrate Transfer Funds Operations
+(12h)"]:::migration
     class migrate_007 critical
     class migrate_007 parallel
-    validator_009["validator_009\nCreate Debit/Credit Test Suite...\n8h\n✓ JaCoCo reports 90%+ branch cov..."]:::validator
+    validator_009{{"VALIDATOR_009
+Create Debit/Credit Test Suite
+(8h)"}}:::validator
     class validator_009 parallel
-    migrate_008["migrate_008\nMigrate Debit Credit Operations...\n8h"]:::migration
+    migrate_008["MIGRATE_008
+Migrate Debit Credit Operations
+(8h)"]:::migration
     class migrate_008 parallel
-    integrate_001["integrate_001\nIntegrate Customer Workflows...\n8h"]:::other
+    integrate_001("INTEGRATE_001
+Integrate Customer Workflows
+(8h)"):::other
     class integrate_001 parallel
-    integrate_002["integrate_002\nIntegrate Account Workflows...\n8h"]:::other
+    integrate_002("INTEGRATE_002
+Integrate Account Workflows
+(8h)"):::other
     class integrate_002 parallel
-    integrate_003["integrate_003\nIntegrate Transaction Workflows...\n10h"]:::other
+    integrate_003("INTEGRATE_003
+Integrate Transaction Workflows
+(10h)"):::other
     class integrate_003 critical
     class integrate_003 parallel
 
@@ -399,9 +447,11 @@ graph TD
             theme: 'default',
             flowchart: {
                 useMaxWidth: true,
-                htmlLabels: true,
+                htmlLabels: false,
                 curve: 'basis',
-                padding: 20
+                padding: 20,
+                nodeSpacing: 80,
+                rankSpacing: 80
             }
         });
     </script>

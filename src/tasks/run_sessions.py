@@ -78,7 +78,7 @@ def create_session(
         )
 
     # No timeout - let session creation take as long as needed
-    with httpx.Client() as client:
+    with httpx.Client(timeout=None) as client:
         response = client.post(url, headers=headers, json=data)
         response.raise_for_status()
 
@@ -94,16 +94,47 @@ def create_session(
 
 
 def get_session_status(api_key: str, session_id: str) -> Dict[str, Any]:
-    """Get current session details including status."""
-
+    """Get current session details including status with retry logic for server errors."""
+    from prefect.logging import get_run_logger
+    import time
+    
+    logger = get_run_logger()
     url = f"https://api.devin.ai/v1/sessions/{session_id}"
     headers = {"Authorization": f"Bearer {api_key}"}
-
-    with httpx.Client() as client:
-        response = client.get(url, headers=headers)
-        response.raise_for_status()
-
-    return response.json()
+    
+    max_retries = 3
+    retry_delay = 30  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            # No timeout for status checks - be patient
+            with httpx.Client(timeout=None) as client:
+                response = client.get(url, headers=headers)
+                response.raise_for_status()
+            return response.json()
+            
+        except httpx.HTTPStatusError as e:
+            # Check if it's a server error (5xx) that we should retry
+            if e.response.status_code >= 500:
+                if attempt < max_retries - 1:
+                    logger.warning(f"   Got {e.response.status_code} error, retrying in {retry_delay}s (attempt {attempt+1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    logger.error(f"   Failed after {max_retries} attempts with {e.response.status_code} error")
+                    raise
+            else:
+                # For non-5xx errors, fail immediately
+                raise
+        except Exception as e:
+            # For network errors, also retry
+            if attempt < max_retries - 1:
+                logger.warning(f"   Network error: {e}, retrying in {retry_delay}s (attempt {attempt+1}/{max_retries})")
+                time.sleep(retry_delay)
+                continue
+            else:
+                logger.error(f"   Failed after {max_retries} attempts with error: {e}")
+                raise
 
 
 def get_session_info(api_key: str, session_id: str) -> Dict[str, Any]:
@@ -111,8 +142,7 @@ def get_session_info(api_key: str, session_id: str) -> Dict[str, Any]:
     url = f"https://api.devin.ai/v1/sessions/{session_id}"
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    # No timeout for status checks
-    with httpx.Client() as client:
+    with httpx.Client(timeout=None) as client:
         response = client.get(url, headers=headers)
         response.raise_for_status()
 
@@ -124,11 +154,11 @@ def send_sleep_message(api_key: str, session_id: str) -> None:
     logger = get_run_logger()
 
     url = f"https://api.devin.ai/v1/sessions/{session_id}/message"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {api_key}"}
     data = {"message": "sleep"}
 
-    # No timeout - let session creation take as long as needed
-    with httpx.Client() as client:
+    # No timeout - wait as long as needed for command to complete
+    with httpx.Client(timeout=None) as client:
         response = client.post(url, headers=headers, json=data)
         response.raise_for_status()
 
@@ -217,8 +247,8 @@ def get_session_structured_output(api_key: str, session_id: str) -> Optional[Dic
     url = f"https://api.devin.ai/v1/sessions/{session_id}"
     headers = {"Authorization": f"Bearer {api_key}"}
 
-    # No timeout for structured output fetches
-    with httpx.Client() as client:
+    # No timeout for structured output fetches - wait as long as needed
+    with httpx.Client(timeout=None) as client:
         response = client.get(url, headers=headers)
         response.raise_for_status()
 
@@ -227,7 +257,11 @@ def get_session_structured_output(api_key: str, session_id: str) -> Optional[Dic
 
 
 def get_enterprise_session_data(api_key: str, session_id: str) -> Dict[str, Any]:
-    """Get full enterprise session data including PRs and analysis."""
+    """Get full enterprise session data including PRs and analysis with retry logic."""
+    from prefect.logging import get_run_logger
+    import time
+    
+    logger = get_run_logger()
     
     # Ensure session_id has the 'devin-' prefix for enterprise API
     if not session_id.startswith('devin-'):
@@ -235,13 +269,40 @@ def get_enterprise_session_data(api_key: str, session_id: str) -> Dict[str, Any]
 
     url = f"https://api.devin.ai/beta/v2/enterprise/sessions/{session_id}"
     headers = {"Authorization": f"Bearer {api_key}"}
-
-    # No timeout for enterprise data fetches
-    with httpx.Client() as client:
-        response = client.get(url, headers=headers)
-        response.raise_for_status()
-
-    return response.json()
+    
+    max_retries = 3
+    retry_delay = 30  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            # No timeout for enterprise data fetches - API can be slow, be patient
+            with httpx.Client(timeout=None) as client:
+                response = client.get(url, headers=headers)
+                response.raise_for_status()
+            return response.json()
+            
+        except httpx.HTTPStatusError as e:
+            # Check if it's a server error (5xx) that we should retry
+            if e.response.status_code >= 500:
+                if attempt < max_retries - 1:
+                    logger.warning(f"   Got {e.response.status_code} error on enterprise API, retrying in {retry_delay}s (attempt {attempt+1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    logger.error(f"   Enterprise API failed after {max_retries} attempts with {e.response.status_code} error")
+                    raise
+            else:
+                # For non-5xx errors, fail immediately
+                raise
+        except Exception as e:
+            # For network errors, also retry
+            if attempt < max_retries - 1:
+                logger.warning(f"   Enterprise API network error: {e}, retrying in {retry_delay}s (attempt {attempt+1}/{max_retries})")
+                time.sleep(retry_delay)
+                continue
+            else:
+                logger.error(f"   Enterprise API failed after {max_retries} attempts with error: {e}")
+                raise
 
 
 def get_session_analysis(api_key: str, session_id: str) -> Optional[Dict[str, Any]]:
@@ -525,6 +586,116 @@ def run_session_and_wait_for_analysis(
     logger.info("✅ Full orchestration complete!")
 
     return result
+
+
+@task(
+    name="Run Session and Wait for PR",
+    description="Create and manage a Devin session, wait for blocked state, send sleep, and wait for PR creation",
+)
+def run_session_and_wait_for_pr(
+    prompt: str,
+    title: str,
+    api_key: Optional[str] = None,
+    poll_interval: int = DEFAULT_POLL_INTERVAL,
+    structured_output_schema: Optional[Dict[str, Any]] = None,
+    max_wait_for_pr: int = 300,  # Max seconds to wait for PR after session ends
+) -> Dict[str, Any]:
+    """
+    Create a Devin session, wait for it to reach blocked state,
+    send sleep message, and wait for PR to be created.
+    
+    This is designed for deterministic orchestration where we need
+    to ensure work is complete and a PR has been created before proceeding.
+    
+    Args:
+        prompt: The task prompt for Devin
+        title: Title for the session
+        api_key: Optional API key (defaults to DEVIN_API_KEY env var)
+        poll_interval: Polling interval in seconds (default: 10)
+        structured_output_schema: Optional schema fields to add to request body
+        max_wait_for_pr: Maximum seconds to wait for PR after session ends (default: 300)
+    
+    Returns:
+        Dict containing session_id, session_url, prs, and structured_output
+    """
+    logger = get_run_logger()
+    
+    logger.info("🎯 Orchestrating Devin Session with PR Wait")
+    
+    # Phase 1: Run session until blocked
+    logger.info("── Phase 1: Session Working ──")
+    session_info = run_session_until_blocked(
+        prompt=prompt,
+        title=title,
+        api_key=api_key,
+        poll_interval=poll_interval,
+        structured_output_schema=structured_output_schema,
+    )
+    
+    api_key = session_info["api_key"]
+    session_id = session_info["session_id"]
+    
+    # Phase 2: Send sleep message to end session
+    logger.info("── Phase 2: Ending Session ──")
+    logger.info("   Sending sleep message...")
+    send_sleep_message(api_key, session_id)
+    
+    # Wait for session to finish (sleeping state)
+    logger.info("   Waiting for session to enter sleeping state...")
+    status = wait_for_status(
+        api_key,
+        session_id,
+        ["finished", "expired"],
+        poll_interval=poll_interval,
+    )
+    
+    if status != "finished":  # finished = sleeping
+        raise ValueError(f"Session ended with unexpected status: {status}")
+    
+    logger.info("   ✅ Session is sleeping")
+    
+    # Phase 3: Wait for PR to be created
+    logger.info("── Phase 3: Waiting for Pull Request ──")
+    
+    elapsed = 0
+    prs = []
+    
+    while elapsed < max_wait_for_pr:
+        # Get enterprise data to check for PRs
+        enterprise_data = get_enterprise_session_data(api_key, session_id)
+        prs = enterprise_data.get("prs", [])
+        
+        if prs:
+            logger.info(f"   🔧 Found {len(prs)} PR(s)!")
+            for pr in prs:
+                pr_url = pr.get("pr_url")
+                if pr_url:
+                    logger.info(f"      📍 {pr_url} (state: {pr.get('state', 'unknown')})")
+            break
+        
+        logger.debug(f"   No PRs yet, waiting... ({elapsed}s / {max_wait_for_pr}s)")
+        time.sleep(poll_interval)
+        elapsed += poll_interval
+    
+    if not prs:
+        logger.warning(f"   ⚠️  No PRs found after waiting {max_wait_for_pr} seconds")
+    
+    # Get final structured output if schema was provided
+    structured_output = None
+    if structured_output_schema:
+        logger.info("   Getting final structured output...")
+        structured_output = get_session_structured_output(api_key, session_id)
+        if structured_output:
+            logger.info("   ✅ Final structured output retrieved")
+    
+    logger.info("✅ Full orchestration complete!")
+    
+    return {
+        "session_id": session_id,
+        "session_url": session_info["session_url"],
+        "prs": prs,
+        "structured_output": structured_output,
+    }
 
 
 if __name__ == "__main__":
