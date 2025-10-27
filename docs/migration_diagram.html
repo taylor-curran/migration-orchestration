@@ -159,27 +159,27 @@
         
         <div class="stats">
             <div class="stat">
-                <span class="stat-value">26</span>
+                <span class="stat-value">23</span>
                 <div class="stat-label">Total Tasks</div>
             </div>
             <div class="stat">
-                <span class="stat-value">7</span>
+                <span class="stat-value">3</span>
                 <div class="stat-label">Setup Tasks</div>
             </div>
             <div class="stat">
-                <span class="stat-value">7</span>
+                <span class="stat-value">9</span>
                 <div class="stat-label">Validators</div>
             </div>
             <div class="stat">
-                <span class="stat-value">12</span>
+                <span class="stat-value">8</span>
                 <div class="stat-label">Migrations</div>
             </div>
             <div class="stat highlight">
-                <span class="stat-value">8</span>
+                <span class="stat-value">6</span>
                 <div class="stat-label">Parallel Groups</div>
             </div>
             <div class="stat highlight">
-                <span class="stat-value">7</span>
+                <span class="stat-value">8</span>
                 <div class="stat-label">Max Parallelism</div>
             </div>
             <div class="stat">
@@ -190,21 +190,21 @@
         
         <div class="efficiency">
             <h2>⚡ Efficiency Analysis</h2>
-            <p><strong>Serial Execution:</strong> 236 hours</p>
-            <p><strong>Parallel Execution:</strong> 82 hours</p>
-            <p><strong>Time Saved:</strong> 154 hours (65.3% faster)</p>
+            <p><strong>Serial Execution:</strong> 198 hours</p>
+            <p><strong>Parallel Execution:</strong> 76 hours</p>
+            <p><strong>Time Saved:</strong> 122 hours (61.6% faster)</p>
             
             <div class="progress-bar">
-                <div class="progress-fill" style="width: 65.3%">
-                    65.3% Efficiency Gain
+                <div class="progress-fill" style="width: 61.6%">
+                    61.6% Efficiency Gain
                 </div>
             </div>
         </div>
         
         <div class="critical-path">
-            <h3>🔴 Critical Path (74 hours)</h3>
+            <h3>🔴 Critical Path (72 hours)</h3>
             <div>
-                <span class="path-step">setup_003</span> → <span class="path-step">setup_005</span> → <span class="path-step">validator_001</span> → <span class="path-step">migrate_001</span> → <span class="path-step">migrate_005</span> → <span class="path-step">migrate_007</span> → <span class="path-step">migrate_010</span> → <span class="path-step">migrate_011</span>
+                <span class="path-step">setup_002</span> → <span class="path-step">validator_001</span> → <span class="path-step">validator_002</span> → <span class="path-step">migrate_001</span> → <span class="path-step">migrate_002</span> → <span class="path-step">migrate_005</span> → <span class="path-step">migrate_007</span> → <span class="path-step">integrate_003</span>
             </div>
         </div>
         
@@ -221,189 +221,151 @@ graph TD
     classDef parallel fill:#fce4ec,stroke:#c2185b,stroke-width:3px,stroke-dasharray: 5 5
 
     %% Task nodes
-    setup_000["setup_000\nVerify and Document Schema Consistency T...\n4h"]:::setup
-    class setup_000 parallel
-    setup_001["setup_001\nEstablish Performance Baseline for Legac...\n10h"]:::setup
+    setup_001["setup_001\nCreate Performance Baselines...\n8h"]:::setup
     class setup_001 parallel
-    setup_002["setup_002\nSetup Continuous Monitoring and Observab...\n8h"]:::setup
+    setup_002["setup_002\nSetup Local SQLite Database...\n6h"]:::setup
+    class setup_002 critical
     class setup_002 parallel
-    setup_003["setup_003\nEnhance CI/CD Pipeline with Coverage Enf...\n8h"]:::setup
-    class setup_003 critical
+    setup_003["setup_003\nConfigure Local Monitoring...\n6h"]:::setup
     class setup_003 parallel
-    setup_004["setup_004\nExtract and Document COBOL Business Rule...\n10h"]:::setup
-    class setup_004 parallel
-    setup_005["setup_005\nCreate Test Infrastructure and Common He...\n8h"]:::setup
-    class setup_005 critical
-    class setup_005 parallel
-    setup_006["setup_006\nDocument Test Data Baseline and Create F...\n6h"]:::setup
-    class setup_006 parallel
-    validator_000["validator_000\nCreate Named Counter Service Test Suite...\n6h\n✓ All 20+ tests pass successfull..."]:::validator
-    class validator_000 parallel
-    validator_001["validator_001\nCreate Comprehensive Customer CRUD Test ...\n12h\n✓ Validation includes: 1 All 4..."]:::validator
+    validator_001["validator_001\nCreate Database Schema Tests...\n6h\n✓ JUnit test suite with 15+ test..."]:::validator
     class validator_001 critical
-    class validator_001 parallel
-    validator_002["validator_002\nCreate Comprehensive Account CRUD Test S...\n12h\n✓ Validation includes: 1 All 3..."]:::validator
+    validator_002["validator_002\nCreate Customer Read Test Suite...\n8h\n✓ JaCoCo reports 90%+ branch cov..."]:::validator
+    class validator_002 critical
     class validator_002 parallel
-    validator_003["validator_003\nCreate Account Inquiry by Customer Test ...\n8h\n✓ Validation includes: 1 All 2..."]:::validator
-    class validator_003 parallel
-    validator_004["validator_004\nCreate Transaction Operations Test Suite...\n12h\n✓ Validation includes: 1 All 3..."]:::validator
-    class validator_004 parallel
-    validator_005["validator_005\nCreate Credit Agency Services Test Suite...\n10h\n✓ Validation includes: 1 All 2..."]:::validator
-    class validator_005 parallel
-    validator_006["validator_006\nCreate Retroactive CreditAgencyService T...\n10h\n✓ Validation includes: 1 All 3..."]:::validator
-    class validator_006 parallel
-    migrate_001["migrate_001\nMigrate INQCUST - Customer Inquiry Opera...\n8h"]:::migration
+    migrate_001["migrate_001\nMigrate Customer Read Operations...\n8h"]:::migration
     class migrate_001 critical
     class migrate_001 parallel
-    migrate_002["migrate_002\nMigrate CRECUST - Create Customer Operat...\n12h"]:::migration
-    class migrate_002 parallel
-    migrate_003["migrate_003\nMigrate UPDCUST - Update Customer Operat...\n10h"]:::migration
+    validator_003["validator_003\nCreate Customer Create Test Suite...\n10h\n✓ JaCoCo reports 90%+ branch cov..."]:::validator
+    class validator_003 parallel
+    migrate_002["migrate_002\nMigrate Customer Create Operations...\n12h"]:::migration
+    class migrate_002 critical
+    validator_004["validator_004\nCreate Customer Update/Delete Test Suite...\n8h\n✓ JaCoCo reports 90%+ branch cov..."]:::validator
+    class validator_004 parallel
+    migrate_003["migrate_003\nMigrate Customer Update Delete...\n10h"]:::migration
     class migrate_003 parallel
-    migrate_004["migrate_004\nMigrate DELCUS - Delete Customer Operati...\n8h"]:::migration
+    validator_005["validator_005\nCreate Account Read Test Suite...\n8h\n✓ JaCoCo reports 90%+ branch cov..."]:::validator
+    class validator_005 parallel
+    migrate_004["migrate_004\nMigrate Account Read Operations...\n8h"]:::migration
     class migrate_004 parallel
-    migrate_005["migrate_005\nMigrate INQACC - Account Inquiry Operati...\n8h"]:::migration
+    validator_006["validator_006\nCreate Account Create Test Suite...\n9h\n✓ JaCoCo reports 90%+ branch cov..."]:::validator
+    class validator_006 parallel
+    migrate_005["migrate_005\nMigrate Account Create Operations...\n10h"]:::migration
     class migrate_005 critical
     class migrate_005 parallel
-    migrate_006["migrate_006\nMigrate INQACCCU - Inquire Accounts by C...\n8h"]:::migration
+    validator_007["validator_007\nCreate Account Update/Delete Test Suite...\n8h\n✓ JaCoCo reports 90%+ branch cov..."]:::validator
+    class validator_007 parallel
+    migrate_006["migrate_006\nMigrate Account Update Delete...\n9h"]:::migration
     class migrate_006 parallel
-    migrate_007["migrate_007\nMigrate CREACC - Create Account Operatio...\n10h"]:::migration
+    validator_008["validator_008\nCreate Transfer Funds Test Suite...\n10h\n✓ JaCoCo reports 90%+ branch cov..."]:::validator
+    class validator_008 parallel
+    migrate_007["migrate_007\nMigrate Transfer Funds Operations...\n12h"]:::migration
     class migrate_007 critical
     class migrate_007 parallel
-    migrate_008["migrate_008\nMigrate UPDACC - Update Account Operatio...\n10h"]:::migration
+    validator_009["validator_009\nCreate Debit/Credit Test Suite...\n8h\n✓ JaCoCo reports 90%+ branch cov..."]:::validator
+    class validator_009 parallel
+    migrate_008["migrate_008\nMigrate Debit Credit Operations...\n8h"]:::migration
     class migrate_008 parallel
-    migrate_009["migrate_009\nMigrate DELACC - Delete Account Operatio...\n8h"]:::migration
-    class migrate_009 parallel
-    migrate_010["migrate_010\nMigrate DBCRFUN - Debit/Credit Fund Oper...\n10h"]:::migration
-    class migrate_010 critical
-    class migrate_010 parallel
-    migrate_011["migrate_011\nMigrate XFRFUN - Transfer Fund Operation...\n10h"]:::migration
-    class migrate_011 critical
-    class migrate_011 parallel
-    migrate_012["migrate_012\nMigrate Credit Agencies 2-5 CRDTAGY2, C...\n10h"]:::migration
-    class migrate_012 parallel
+    integrate_001["integrate_001\nIntegrate Customer Workflows...\n8h"]:::other
+    class integrate_001 parallel
+    integrate_002["integrate_002\nIntegrate Account Workflows...\n8h"]:::other
+    class integrate_002 parallel
+    integrate_003["integrate_003\nIntegrate Transaction Workflows...\n10h"]:::other
+    class integrate_003 critical
+    class integrate_003 parallel
 
     %% Dependencies
-    setup_003 --> setup_005
-    setup_002 --> setup_006
-    setup_003 --> validator_000
-    setup_004 --> validator_000
-    setup_005 --> validator_000
     setup_002 --> validator_001
-    setup_004 --> validator_001
-    setup_005 --> validator_001
     setup_002 --> validator_002
-    setup_004 --> validator_002
-    setup_005 --> validator_002
+    validator_001 --> validator_002
+    validator_002 --> migrate_001
     setup_002 --> validator_003
-    setup_004 --> validator_003
-    setup_005 --> validator_003
-    setup_002 --> validator_004
-    setup_004 --> validator_004
-    setup_005 --> validator_004
-    setup_002 --> validator_005
-    setup_004 --> validator_005
-    setup_005 --> validator_005
-    setup_002 --> validator_006
-    setup_004 --> validator_006
-    setup_005 --> validator_006
-    setup_001 --> migrate_001
-    setup_003 --> migrate_001
-    validator_001 --> migrate_001
+    validator_001 --> validator_003
+    validator_003 --> migrate_002
     migrate_001 --> migrate_002
-    validator_001 --> migrate_002
-    validator_005 --> migrate_002
-    validator_006 --> migrate_002
+    setup_002 --> validator_004
+    validator_001 --> validator_004
+    validator_004 --> migrate_003
     migrate_001 --> migrate_003
     migrate_002 --> migrate_003
-    validator_001 --> migrate_003
-    migrate_001 --> migrate_004
-    migrate_002 --> migrate_004
-    migrate_003 --> migrate_004
-    validator_001 --> migrate_004
-    migrate_001 --> migrate_005
-    setup_001 --> migrate_005
-    setup_003 --> migrate_005
-    validator_002 --> migrate_005
-    migrate_001 --> migrate_006
+    setup_002 --> validator_005
+    validator_001 --> validator_005
+    validator_005 --> migrate_004
+    setup_002 --> validator_006
+    validator_001 --> validator_006
+    validator_006 --> migrate_005
+    migrate_002 --> migrate_005
+    migrate_004 --> migrate_005
+    setup_002 --> validator_007
+    validator_001 --> validator_007
+    validator_007 --> migrate_006
+    migrate_004 --> migrate_006
     migrate_005 --> migrate_006
-    validator_003 --> migrate_006
-    migrate_001 --> migrate_007
+    setup_002 --> validator_008
+    validator_001 --> validator_008
+    validator_008 --> migrate_007
+    migrate_004 --> migrate_007
     migrate_005 --> migrate_007
-    validator_002 --> migrate_007
+    setup_002 --> validator_009
+    validator_001 --> validator_009
+    validator_009 --> migrate_008
+    migrate_004 --> migrate_008
     migrate_005 --> migrate_008
-    migrate_007 --> migrate_008
-    validator_002 --> migrate_008
-    migrate_005 --> migrate_009
-    migrate_007 --> migrate_009
-    migrate_008 --> migrate_009
-    validator_002 --> migrate_009
-    migrate_005 --> migrate_010
-    migrate_007 --> migrate_010
-    validator_004 --> migrate_010
-    migrate_010 --> migrate_011
-    validator_004 --> migrate_011
-    validator_005 --> migrate_012
-    validator_006 --> migrate_012
+    migrate_001 --> integrate_001
+    migrate_002 --> integrate_001
+    migrate_003 --> integrate_001
+    migrate_004 --> integrate_002
+    migrate_005 --> integrate_002
+    migrate_006 --> integrate_002
+    migrate_007 --> integrate_003
+    migrate_008 --> integrate_003
 
     %% Parallel group annotations
     subgraph parallel_group_0[Parallel Group - Level 0]
         direction LR
-        setup_000
         setup_001
         setup_002
         setup_003
-        setup_004
     end
     style parallel_group_0 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
-    subgraph parallel_group_1[Parallel Group - Level 1]
+    subgraph parallel_group_1[Parallel Group - Level 2]
         direction LR
-        setup_005
-        setup_006
-    end
-    style parallel_group_1 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
-    subgraph parallel_group_2[Parallel Group - Level 2]
-        direction LR
-        validator_000
-        validator_001
         validator_002
         validator_003
         validator_004
         validator_005
         validator_006
+        validator_007
+        validator_008
+        validator_009
     end
-    style parallel_group_2 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
-    subgraph parallel_group_3[Parallel Group - Level 3]
+    style parallel_group_1 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
+    subgraph parallel_group_2[Parallel Group - Level 3]
         direction LR
         migrate_001
-        migrate_012
+        migrate_004
     end
-    style parallel_group_3 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
-    subgraph parallel_group_4[Parallel Group - Level 4]
-        direction LR
-        migrate_002
-        migrate_005
-    end
-    style parallel_group_4 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
-    subgraph parallel_group_5[Parallel Group - Level 5]
+    style parallel_group_2 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
+    subgraph parallel_group_3[Parallel Group - Level 5]
         direction LR
         migrate_003
+        migrate_005
+    end
+    style parallel_group_3 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
+    subgraph parallel_group_4[Parallel Group - Level 6]
+        direction LR
         migrate_006
         migrate_007
+        migrate_008
+        integrate_001
+    end
+    style parallel_group_4 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
+    subgraph parallel_group_5[Parallel Group - Level 7]
+        direction LR
+        integrate_002
+        integrate_003
     end
     style parallel_group_5 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
-    subgraph parallel_group_6[Parallel Group - Level 6]
-        direction LR
-        migrate_004
-        migrate_008
-        migrate_010
-    end
-    style parallel_group_6 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
-    subgraph parallel_group_7[Parallel Group - Level 7]
-        direction LR
-        migrate_009
-        migrate_011
-    end
-    style parallel_group_7 fill:#fce4ec,stroke:#c2185b,stroke-width:2px,stroke-dasharray: 5 5
             </div>
         </div>
         
